@@ -1332,11 +1332,9 @@ body.grad-open #ambient { opacity: 0; }
     border-radius: 50%;
     background: radial-gradient(closest-side, var(--halo, rgba(255, 150, 190, .7)), transparent);
     animation: e2Halo 4.2s ease-in-out infinite;
-    will-change: transform, opacity;
-    transform: translateZ(0);
 }
 #envelope-section .env-col:first-child .envelope-wrapper { --halo: rgba(150, 170, 255, .75); }
-@keyframes e2Halo { 0%, 100% { opacity: .55; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.08); } }
+@keyframes e2Halo { 0%, 100% { opacity: .55; scale: .94; } 50% { opacity: 1; scale: 1.08; } }
 
 #envelope-section .envelope {
     --e-inner: #f6a6c0;
@@ -2497,23 +2495,101 @@ body.cin-open #hearts-container { display: none; }
 
     /* phong thư: bóng đổ + mờ nhẹ hơn */
     .env-shadow { filter: none; opacity: .6; }
-
-    /* ⚡ THỦ PHẠM CHÍNH màn hình đầu: quầng sáng sau phong thư nhấp nháy liên tục
-       (lớp trong suốt rất lớn, bị vẽ lại mỗi khung hình) -> để đứng yên */
-    #envelope-section .envelope-wrapper::before { animation: none; opacity: .8; will-change: auto; transform: none; }
-    #envelope-section .env-shadow { animation: none; }
-    /* con dấu: bỏ vòng sóng lan (scale lớn, trong suốt) */
-    #envelope-section .wax-seal::after { animation: none; opacity: 0; }
-
-    /* các chuyển động lặp vô hạn nhỏ: cộng lại rất tốn trên máy yếu -> dừng, giữ hiệu ứng xuất hiện ban đầu */
-    .aurora { animation: none; will-change: auto; }
-    .flag { animation: none; }
-    .stk, .spk { animation: none; }
-    .split .ch { animation: e2ChPop .75s cubic-bezier(.34, 1.56, .64, 1) both; animation-delay: calc(.2s + var(--i) * 30ms); }
-    .tw { animation: none; }
 }
 
 /* thiết bị yếu / người dùng bật tiết kiệm dữ liệu */
 @media (prefers-reduced-data: reduce) {
     .rays, .aurora { animation: none; }
 }
+
+
+/* =====================================================================
+   🚀 INTRO MƯỢT v3 — chia giai đoạn để điện thoại không bị giật lúc vào
+   ---------------------------------------------------------------------
+   Vấn đề cũ: lúc mới vào trang, hàng trăm phần tử cùng bắt đầu animation
+   trong cùng 1 khung hình (từng chữ, dây cờ SVG, aurora, hạt bay, sao,
+   tim, pháo...) trong khi font còn đang tải -> điện thoại bị giật mạnh.
+
+   Cách làm mới (script.js điều khiển bằng class trên <html>):
+     • html.js         : JS chạy được -> bật cơ chế chia giai đoạn
+     • html.lite       : điện thoại / máy yếu -> dùng intro nhẹ hơn
+     • html.intro-go   : font đã sẵn sàng -> bắt đầu intro (chỉ vài phần tử)
+     • html.intro-done : intro xong -> mới bật hiệu ứng nền lặp vô hạn
+   ===================================================================== */
+
+/* Hai lá thư lớn: ẩn hẳn (display:none) cho tới khi mở
+   -> không tải ảnh ngầm, không chạy animation ngầm, không tốn bộ nhớ */
+.expanded-letter.is-off { display: none !important; }
+
+/* Cô lập lớp nền: thay đổi bên trong không làm trình duyệt tính lại cả trang */
+#ambient { contain: layout paint style; }
+
+/* ---------- Giai đoạn 0: chờ font + layout ổn định (tối đa ~1.3s) ----------
+   Tạm dừng mọi animation ở màn đầu. Phần tử có fill-mode backwards/both
+   sẽ đứng yên ở trạng thái "ẩn" rồi mới trượt vào khi intro bắt đầu. */
+html.js:not(.intro-go) #envelope-section,
+html.js:not(.intro-go) #envelope-section *,
+html.js:not(.intro-go) #envelope-section *::before,
+html.js:not(.intro-go) #envelope-section *::after,
+html.js:not(.intro-go) #ambient,
+html.js:not(.intro-go) #ambient * { animation-play-state: paused !important; }
+
+html.js:not(.intro-go) .env-underline,
+html.js:not(.intro-go) .tw { opacity: 0; }
+.env-underline, .tw { transition: opacity .6s ease .45s; }
+
+/* ---------- Giai đoạn 1: intro (≈2–3s) ----------
+   Các hiệu ứng lặp vô hạn (không cần thiết lúc này) được giữ nguyên trạng thái
+   cho tới khi intro xong, để GPU/CPU chỉ lo phần chuyển động chính. */
+html:not(.intro-done) :is(.tw, .env-heart, .env-underline b, .tag-ico, .cb-ico, .cb-shine,
+    .env-hint span, .stk, .spk, .env-shadow, .aurora, .rays, #bunting .flag,
+    #envelope-section .envelope, #envelope-section .wax-seal) { animation-play-state: paused !important; }
+html:not(.intro-done) #envelope-section .envelope-wrapper::before,
+html:not(.intro-done) #envelope-section .wax-seal::before,
+html:not(.intro-done) #envelope-section .wax-seal::after { animation-play-state: paused !important; }
+
+/* ---------- Điện thoại / máy yếu: intro nhẹ ---------- */
+
+/* Chữ: animate theo TỪ (≈10 phần tử) thay vì từng CHỮ (≈50 phần tử, mỗi cái 2 animation) */
+html.lite .split .ch { animation: none !important; }
+html.lite .split .word {
+    animation: e2WordIn .55s cubic-bezier(.22, 1, .36, 1) both;
+    animation-delay: calc(.12s + var(--w, 0) * 75ms);
+}
+@keyframes e2WordIn {
+    from { opacity: 0; transform: translate3d(0, 16px, 0) scale(.92); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Phong thư: trượt nhẹ từ dưới lên (chỉ opacity + transform), bỏ xoay + phóng to từ .55 */
+html.lite #envelope-section .envelope-wrapper { animation: e2EnvDropLite .7s cubic-bezier(.22, 1, .36, 1) .2s both; }
+html.lite #envelope-section .env-col:nth-child(2) .envelope-wrapper { animation-delay: .35s; }
+@keyframes e2EnvDropLite {
+    from { opacity: 0; transform: translate3d(0, 36px, 0) scale(.94); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Nhãn, nút, dòng gợi ý: vào nhanh hơn, dồn trong ~1.2s đầu */
+html.lite .env-tag { animation: e2TagIn .5s cubic-bezier(.22, 1, .36, 1) .35s backwards; }
+html.lite .env-col:nth-child(2) .env-tag { animation-delay: .45s; }
+html.lite .cute-btn { animation: e2BtnIn .55s cubic-bezier(.22, 1, .36, 1) .6s backwards; }
+html.lite .env-col:nth-child(2) .cute-btn { animation-delay: .7s; }
+html.lite .env-hint { animation: e2BtnIn .5s ease .9s backwards; }
+
+/* Dây cờ: SVG animate từng lá cờ + drop-shadow = vẽ lại cả dải 150px mỗi khung hình
+   (chạy trên main thread) -> trên điện thoại để tĩnh, bỏ filter */
+html.lite #bunting { filter: none; }
+html.lite #bunting .flag { animation: none !important; }
+
+/* Quầng aurora: để tĩnh (đã là radial-gradient mềm nên nhìn vẫn đẹp) */
+html.lite .aurora { animation: none !important; will-change: auto; }
+
+/* Các chi tiết lặp vô hạn nhỏ: bỏ trên điện thoại (giữ phong thư bồng bềnh, con dấu đập nhịp, sticker bay) */
+html.lite :is(.tag-ico, .cb-ico, .cb-shine, .env-hint span, .spk, .env-underline b, .env-heart) { animation: none !important; }
+html.lite #envelope-section .envelope-wrapper::before { animation: none; opacity: .85; }
+html.lite #envelope-section .wax-seal::before,
+html.lite #envelope-section .wax-seal::after { animation: none; display: none; }
+html.lite .env-shadow { animation: none; }
+
+/* Sao lấp lánh: chỉ cần opacity + scale, bỏ text-shadow (đã có ở khối trên) */
+html.lite .tstar { text-shadow: none; }

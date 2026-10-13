@@ -79,6 +79,8 @@ function openEnvelope(type = "love") {
         setTimeout(() => {
             section.style.display = "none";
             const modalEl = document.getElementById(modal);
+            modalEl.classList.remove("is-off");   // thư đang display:none -> hiện lại
+            void modalEl.offsetWidth;             // ép tính layout để transition vẫn chạy mượt
             modalEl.scrollTop = 0;
             modalEl.classList.add("show");
             document.body.classList.add("has-letter");   // ẩn nền ambient -> dừng animation phía sau
@@ -101,7 +103,10 @@ function closeLetter() {
     document.body.classList.remove("grad-open", "has-letter");
 
     const { env, modal } = LETTERS[activeType];
-    document.getElementById(modal).classList.remove("show");
+    const modalToHide = document.getElementById(modal);
+    modalToHide.classList.remove("show");
+    // sau khi hiệu ứng đóng xong -> ẩn hẳn để trình duyệt khỏi vẽ/animate ngầm
+    setTimeout(() => { if (!modalToHide.classList.contains("show")) modalToHide.classList.add("is-off"); }, 800);
 
     const envSection = document.getElementById("envelope-section");
     envSection.style.display = "flex";
@@ -552,9 +557,10 @@ function triggerHeartBurst(type = "love", count = 25) {
 
 // Tim bay nhẹ ở nền
 setInterval(() => {
-    if (document.hidden || activeType === "grad" || reduceMotion) return;   // tab ẩn / thư tốt nghiệp: khỏi tạo
+    if (!window.__introDone) return;                                          // đợi intro xong mới thả tim
+    if (document.hidden || activeType || reduceMotion) return;                // tab ẩn / đang mở thư: khỏi tạo
     createHeartParticle();
-}, LITE ? 2200 : 1200);
+}, LITE ? 3000 : 1200);
 
 // =====================================================
 // KHỞI TẠO: đốm sáng nền, lấp lánh trong thư, hiệu ứng ảnh, vệt sao
@@ -562,7 +568,7 @@ setInterval(() => {
 window.addEventListener("DOMContentLoaded", () => {
     // Đốm sáng lấp lánh ở nền trang
     const sparkleContainer = document.getElementById("sparkles-container");
-    for (let i = 0; i < (LITE ? 8 : 20); i++) {
+    for (let i = 0; i < (LITE ? 0 : 20); i++) {   // điện thoại: bỏ hẳn (trùng với sao lấp lánh ở #ambient)
         const s = document.createElement("div");
         s.className = "absolute rounded-full bg-rose-300 sparkle";
         const size = 2 + Math.random() * 4;
@@ -985,6 +991,7 @@ function closeCinema() {
 
     // ---------- 1. Tách chữ để từng chữ nhún nhảy ----------
     function splitLetters() {
+        let wc = 0;   // số thứ tự từ (toàn trang) -> điện thoại animate theo từ thay vì từng chữ
         $$(".split").forEach((el) => {
             const text = el.textContent.normalize("NFC").trim();
             el.textContent = "";
@@ -995,6 +1002,7 @@ function closeCinema() {
                 const w = document.createElement("span");
                 w.className = "word";
                 w.setAttribute("aria-hidden", "true");
+                w.style.setProperty("--w", wc++);
                 Array.from(word).forEach((c) => {
                     const s = document.createElement("span");
                     s.className = "ch";
@@ -1011,7 +1019,7 @@ function closeCinema() {
     // ---------- 2. Hạt bay lên (tim, hoa, bong bóng) ----------
     function spawnAmbient(seed) {
         const box = $("#ambient-items");
-        if (!box || box.childElementCount > (LITE ? 10 : 28)) return;
+        if (!box || box.childElementCount > (LITE ? 7 : 28)) return;
         if (!seed && !idle()) return;
         const el = document.createElement("span");
         const bubble = Math.random() < 0.35;
@@ -1030,7 +1038,7 @@ function closeCinema() {
     function seedStars() {
         const box = $("#ambient");
         if (!box) return;
-        for (let i = 0; i < (LITE ? 14 : 34); i++) {
+        for (let i = 0; i < (LITE ? 8 : 34); i++) {
             const s = document.createElement("i");
             s.className = "tstar";
             s.textContent = Math.random() < 0.5 ? "✦" : "✧";
@@ -1196,7 +1204,59 @@ function closeCinema() {
         $$(".env-col.chosen").forEach((c) => c.classList.remove("chosen"));
     };
 
-    // ---------- Khởi tạo ----------
+    // ---------- Khởi tạo (chia giai đoạn để không dồn hết vào một khung hình) ----------
+    //  Giai đoạn 0: dựng DOM tối thiểu (tách chữ, dây cờ) -> animation đang tạm dừng bằng CSS
+    //  Giai đoạn 1: chờ font tải xong (tối đa ~1.2s) rồi mới chạy intro (class html.intro-go)
+    //  Giai đoạn 2: intro xong (html.intro-done) mới bật hiệu ứng nền: sao, hạt bay, tim, sao băng...
+    const root = document.documentElement;
+    let introStarted = false, ambientStarted = false;
+
+    function waitFonts(maxWait) {
+        if (!document.fonts || !document.fonts.load) return Promise.resolve();
+        const cssReady = window.__fcss ? Promise.resolve() : new Promise((r) => window.addEventListener("fcss", r, { once: true }));
+        const loadAll = cssReady.then(() => Promise.all([
+            document.fonts.load('700 1em "Dancing Script"', "Có hai bức thư nhỏ gửi đến ai đó"),
+            document.fonts.load('800 1em "Baloo 2"', "Gửi cô Gái Nào Đó"),
+            document.fonts.load('700 1em "Nunito"', "Mở Thư Tốt Nghiệp")
+        ]));
+        return Promise.race([loadAll.catch(() => {}), new Promise((r) => setTimeout(r, maxWait))]);
+    }
+
+    function startIntro() {
+        if (introStarted) return;
+        introStarted = true;
+        // 2 lần rAF: đảm bảo trình duyệt đã vẽ xong layout (kể cả font) rồi mới bắt đầu animation
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            root.classList.add("intro-go");
+            setTimeout(finishIntro, LITE ? 2300 : 3000);
+        }));
+    }
+
+    function finishIntro() {
+        if (window.__introDone) return;
+        window.__introDone = true;
+        root.classList.add("intro-go", "intro-done");   // mở khoá các animation lặp vô hạn
+        if (reduceMotion || activeType) return;
+        startAmbient();
+    }
+
+    function startAmbient() {
+        if (ambientStarted) return;
+        ambientStarted = true;
+        const later = window.requestIdleCallback ? (f) => requestIdleCallback(f, { timeout: 700 }) : (f) => setTimeout(f, 80);
+        later(seedStars);
+        // thả dần từng hạt (không bật cùng lúc) -> không bị giật khi emoji được vẽ lần đầu
+        const first = LITE ? 3 : 10;
+        for (let i = 0; i < first; i++) setTimeout(() => spawnAmbient(true), 300 + i * 260);
+        setInterval(() => spawnAmbient(false), LITE ? 1900 : 650);
+        if (!LITE) {
+            setTimeout(shootingStar, 2500);   // sao băng bỏ trên điện thoại
+            setTimeout(() => {
+                if (!activeType) burst(window.innerWidth / 2, window.innerHeight * 0.3, 20, ["✨", "💖", "⭐", "🌸", "💗"], [90, 300]);
+            }, 300);
+        }
+    }
+
     function init() {
         splitLetters();
         drawBunting();
@@ -1204,18 +1264,18 @@ function closeCinema() {
         let rt;
         window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(drawBunting, 150); });
 
-        if (reduceMotion) return;   // tôn trọng người dùng muốn giảm chuyển động
+        if (reduceMotion) {   // tôn trọng người dùng muốn giảm chuyển động
+            window.__introDone = true;
+            root.classList.add("intro-go", "intro-done");
+            return;
+        }
 
-        seedStars();
-        for (let i = 0; i < (LITE ? 6 : 14); i++) spawnAmbient(true);
-        setInterval(() => spawnAmbient(false), LITE ? 1400 : 650);
-        if (!LITE) setTimeout(shootingStar, 2500);   // sao băng bỏ trên điện thoại
         initTilt();
 
-        // Vệt sao theo con trỏ
+        // Vệt sao theo con trỏ (chỉ chuột, không chạy trên cảm ứng)
         let lastT = 0;
         window.addEventListener("pointermove", (e) => {
-            if (activeType || e.pointerType === "touch") return;
+            if (activeType || e.pointerType === "touch" || !window.__introDone) return;
             const now = performance.now();
             if (now - lastT < 55) return;
             lastT = now;
@@ -1229,10 +1289,11 @@ function closeCinema() {
             burst(e.clientX, e.clientY, 12, AMB_EMOJI, [50, 150]);
         });
 
-        // Màn chào: pháo nhỏ khi vừa vào trang
-        setTimeout(() => {
-            if (!activeType) burst(window.innerWidth / 2, window.innerHeight * 0.3, 20, ["✨", "💖", "⭐", "🌸", "💗"], [90, 300]);
-        }, 1000);
+        // Người dùng chạm sớm thì không bắt họ chờ
+        window.addEventListener("pointerdown", () => { startIntro(); }, { once: true, passive: true });
+
+        waitFonts(LITE ? 1000 : 1300).then(startIntro);
+        setTimeout(startIntro, 1500);   // chốt an toàn
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
