@@ -1332,9 +1332,11 @@ body.grad-open #ambient { opacity: 0; }
     border-radius: 50%;
     background: radial-gradient(closest-side, var(--halo, rgba(255, 150, 190, .7)), transparent);
     animation: e2Halo 4.2s ease-in-out infinite;
+    will-change: transform, opacity;
+    transform: translateZ(0);
 }
 #envelope-section .env-col:first-child .envelope-wrapper { --halo: rgba(150, 170, 255, .75); }
-@keyframes e2Halo { 0%, 100% { opacity: .55; scale: .94; } 50% { opacity: 1; scale: 1.08; } }
+@keyframes e2Halo { 0%, 100% { opacity: .55; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.08); } }
 
 #envelope-section .envelope {
     --e-inner: #f6a6c0;
@@ -2495,6 +2497,20 @@ body.cin-open #hearts-container { display: none; }
 
     /* phong thư: bóng đổ + mờ nhẹ hơn */
     .env-shadow { filter: none; opacity: .6; }
+
+    /* ⚡ THỦ PHẠM CHÍNH màn hình đầu: quầng sáng sau phong thư nhấp nháy liên tục
+       (lớp trong suốt rất lớn, bị vẽ lại mỗi khung hình) -> để đứng yên */
+    #envelope-section .envelope-wrapper::before { animation: none; opacity: .8; will-change: auto; transform: none; }
+    #envelope-section .env-shadow { animation: none; }
+    /* con dấu: bỏ vòng sóng lan (scale lớn, trong suốt) */
+    #envelope-section .wax-seal::after { animation: none; opacity: 0; }
+
+    /* các chuyển động lặp vô hạn nhỏ: cộng lại rất tốn trên máy yếu -> dừng, giữ hiệu ứng xuất hiện ban đầu */
+    .aurora { animation: none; will-change: auto; }
+    .flag { animation: none; }
+    .stk, .spk { animation: none; }
+    .split .ch { animation: e2ChPop .75s cubic-bezier(.34, 1.56, .64, 1) both; animation-delay: calc(.2s + var(--i) * 30ms); }
+    .tw { animation: none; }
 }
 
 /* thiết bị yếu / người dùng bật tiết kiệm dữ liệu */
