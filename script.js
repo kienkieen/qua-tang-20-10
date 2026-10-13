@@ -93,8 +93,7 @@ function openEnvelope(type = "love") {
 
             prepareGalleryReveal(modalEl);
             // thư tốt nghiệp: pháo giấy nổ đúng lúc rèm kéo ra
-            if (type === "grad") setTimeout(() => { if (activeType === "grad") celebrate(type); }, 1700);
-            else celebrate(type);
+            if (type !== "grad") celebrate(type);   // thư tốt nghiệp: không tự bắn pháo giấy
             if (MUSIC.autoPlayOnOpen && !musicOn) toggleMusic();
         }, FADE);
     }, WAIT);
@@ -308,6 +307,11 @@ let revealIO = null;
 function prepareGalleryReveal(modalEl) {
     setupGalleryPhotos(modalEl);                            // nạp ảnh thư viện theo kiểu thu nhỏ, đúng lúc cần
     if (window.gmPrepareLetter) gmPrepareLetter(modalEl);   // chữ trong thư hiện dần (xem cuối file)
+    if (modalEl.id === "grad-modal") {                      // thư tốt nghiệp: tĩnh hoàn toàn, ảnh hiện ngay không hiệu ứng
+        if (revealIO) revealIO.disconnect();
+        modalEl.querySelectorAll(".gm-frame").forEach((c) => c.classList.remove("pre", "pop"));
+        return;
+    }
     if (revealIO) revealIO.disconnect();
     const cards = modalEl.querySelectorAll(".gm-frame");
     if (!cards.length) return;
@@ -1561,9 +1565,10 @@ function closeCinema() {
     const modal = document.getElementById("grad-modal");
     if (!modal) return;
     const stage = modal.querySelector(".gm-stage");
+    const GRAD_STATIC = true;   // thư tốt nghiệp: không hiệu ứng động
 
     // 1) Bụi sáng bay lên trong chùm sáng máy chiếu (điện thoại: bỏ – nhiều lớp animation chạy ngầm khi cuộn)
-    if (!reduceMotion && !LITE) {
+    if (!GRAD_STATIC && !reduceMotion && !LITE) {
         const box = document.createElement("div");
         box.className = "gm-bokeh";
         box.setAttribute("aria-hidden", "true");
@@ -1587,7 +1592,7 @@ function closeCinema() {
 
     // 2) Tiêu đề trượt xuống và mờ dần khi cuộn khỏi màn đầu
     //    (điện thoại: bỏ – nó cập nhật style bằng JS ở MỖI khung hình cuộn nên làm cuộn bị giật)
-    if (stage && !reduceMotion && !LITE) {
+    if (!GRAD_STATIC && stage && !reduceMotion && !LITE) {
         const ttl = stage.querySelector(".gm-title");
         let ticking = false, lastP = -1;
         modal.addEventListener("scroll", () => {
@@ -1608,6 +1613,7 @@ function closeCinema() {
     let letterIO = null;
     window.gmPrepareLetter = function (m) {
         if (!m || (m.id !== "grad-modal" && m.id !== "letter-modal")) return;
+        if (m.id === "grad-modal") return;   // thư tốt nghiệp: chữ hiện ngay, không hiệu ứng
         if (letterIO) letterIO.disconnect();
         const paras = [...m.querySelectorAll(m.id === "grad-modal" ? ".gm-letter p" : ".lm-text p")];
         if (reduceMotion || !("IntersectionObserver" in window)) {
@@ -1631,7 +1637,7 @@ function closeCinema() {
 
     // 4) Nút "Xem như một thước phim": lần đầu cuộn tới thì đèn bật sáng
     const play = modal.querySelector(".gm-play");
-    if (play && !reduceMotion && "IntersectionObserver" in window) {
+    if (!GRAD_STATIC && play && !reduceMotion && "IntersectionObserver" in window) {
         play.classList.add("unlit");
         const io = new IntersectionObserver((entries) => {
             if (!entries.some((e) => e.isIntersecting)) return;

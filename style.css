@@ -2744,3 +2744,48 @@ html.lite .cin-slide { animation: none; }
 html.lite .cin-slide .cin-center { animation: cinIn .9s ease backwards; }
 html.lite .cin-slide.out { opacity: 1; transition: none; }
 html.lite .cin-slide.out .cin-center { opacity: 0; transition: opacity .9s ease; }
+
+
+/* =====================================================================
+   🧊 v5 — THƯ TỐT NGHIỆP: TĨNH HOÀN TOÀN (mọi thiết bị)
+   Bỏ mọi animation/transition bên trong thư; rèm đã kéo sẵn, tiêu đề + chùm sáng hiện sẵn.
+   Muốn bật lại hiệu ứng: xoá cả khối này (và đặt GRAD_STATIC = false trong script.js).
+   ===================================================================== */
+#grad-modal *, #grad-modal *::before, #grad-modal *::after,
+#grad-modal::before, #grad-modal::after {
+    animation: none !important;
+    transition: none !important;
+}
+
+/* lớp trang trí động: bỏ hẳn */
+#grad-modal .gm-bokeh, #grad-modal .gm-search, #grad-modal .gm-flare, #grad-modal .gm-scroll,
+#grad-modal .gm-stage::after, #grad-modal .gp-ring { display: none !important; }
+
+/* rèm kéo sẵn về hai bên, chùm sáng hiện sẵn */
+#grad-modal .gm-curtain { transform: scaleX(.075); box-shadow: 0 0 28px rgba(5, 6, 50, .8); }
+#grad-modal .gm-beam { opacity: 1; -webkit-mask-image: none; mask-image: none; filter: none; }
+
+/* tiêu đề: chữ tĩnh, bóng nhẹ (bỏ blur lớn) */
+#grad-modal .gm-title { transform: none; opacity: 1; }
+#grad-modal .gm-title h2 { filter: drop-shadow(0 3px 0 rgba(30, 20, 110, .55)); }
+#grad-modal .gm-gallery h3 { filter: none; }
+#grad-modal .gm-actions::before { filter: none; opacity: .7; scale: 1; }
+
+/* chữ + ảnh luôn hiện sẵn, khung ảnh nằm thẳng, bóng nhẹ */
+#grad-modal .gm-letter .gm-rv { opacity: 1; transform: none; filter: none; }
+#grad-modal .gm-frame.pre img { opacity: 1; filter: none; }
+#grad-modal .gm-frame, #grad-modal .gm-reel .gm-frame { rotate: 0deg; box-shadow: 0 10px 20px -10px rgba(4, 4, 36, .8), 0 0 0 1px rgba(255, 217, 138, .3); }
+#grad-modal .gm-frame:hover, #grad-modal .gm-frame:focus-visible { translate: 0 0; }
+#grad-modal .gm-letter { box-shadow: 0 0 0 5px rgba(255, 255, 255, .25), 0 18px 30px -18px rgba(15, 20, 120, .7); }
+#grad-modal .gm-letter::after { filter: none; }
+
+/* dải film hai bên đứng yên */
+#grad-modal .gm-gallery::before, #grad-modal .gm-end::before { box-shadow: none; }
+
+/* nút chiếu phim: giữ dáng đẹp, bỏ bóng đèn nháy + vệt sáng quét + quầng sáng lớn + filter */
+#grad-modal .gp-bulbs { filter: none; }
+#grad-modal .gp-bulbs::after { display: none; }
+#grad-modal .gp-shine, #grad-modal .gp-reel { filter: none; }
+#grad-modal .gp-shine { display: none; }
+#grad-modal .gm-play:hover { transform: none; }
+#grad-modal .gp-face { box-shadow: inset 0 2px 0 rgba(255,255,255,.95), inset 0 0 0 2px rgba(255,255,255,.55), 0 10px 22px -10px rgba(255,140,90,.8); }
