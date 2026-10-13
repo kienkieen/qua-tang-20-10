@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Món Quà Dành Cho Em ❤️</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Dancing+Script:wght@600;700&family=Montserrat:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;1,400&family=Baloo+2:wght@600;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <script>function photoMissing(i){}</script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="flex flex-col items-center justify-center p-4 selection:bg-pink-200">
+
+    <div id="sparkles-container" class="fixed inset-0 pointer-events-none overflow-hidden z-0"></div>
+    <div id="hearts-container" class="fixed inset-0 pointer-events-none overflow-hidden z-50"></div>
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none" style="z-index:60"></canvas>
+
+    <!-- 🌸 Lớp nền hiệu ứng cho màn hình phong thư -->
+    <div id="ambient" aria-hidden="true">
+        <div class="aurora au-1"></div>
+        <div class="aurora au-2"></div>
+        <div class="aurora au-3"></div>
+        <div class="rays"></div>
+        <div id="ambient-items"></div>
+        <svg id="bunting" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div id="fx-top" aria-hidden="true"></div>
+
+    <!-- Nhạc nền: file mp3 được chọn trong script.js (MUSIC.src) -->
+    <audio id="bgMusic" loop preload="auto"></audio>
+
+    <!-- ==================================================
+         MÀN HÌNH ĐẦU: HAI PHONG THƯ
+         (trái/trên: tốt nghiệp  |  phải/dưới: 20/10)
+         ================================================== -->
+    <div id="envelope-section" class="flex flex-col items-center justify-center min-h-[85vh] py-8 z-10 transition-all duration-700">
+
+        <header class="env-head">
+            <p class="env-script">
+                <span class="tw tw-l">✨</span>
+                <span class="split">Có hai bức thư nhỏ gửi đến ai đó</span>
+                <span class="tw tw-r">✨</span>
+            </p>
+            <h1 class="env-title">
+                <span class="split">Gửi cô Gái Nào Đó</span>
+                <span class="split">-.-</span>
+            </h1>
+            <div class="env-underline"><i></i><b>💗</b><i></i></div>
+        </header>
+
+        <div class="env-row">
+
+            <!-- ===== THƯ 1: MỪNG TỐT NGHIỆP ===== -->
+            <div class="env-col">
+                <p class="env-tag env-tag-grad"><span class="tag-ico">🎓</span><span>Mừng ngày tốt nghiệp</span></p>
+
+                <div class="envelope-wrapper">
+                    <span class="stk stk-a" style="--d:0s">🌟</span>
+                    <span class="stk stk-b" style="--d:.8s">🎈</span>
+                    <span class="stk stk-c" style="--d:1.5s">📚</span>
+                    <span class="spk spk-1">✦</span><span class="spk spk-2">✧</span><span class="spk spk-3">✦</span>
+
+                    <div class="envelope grad" id="envelopeGrad" onclick="openEnvelope('grad')">
+                        <div class="envelope-flap"></div>
+                        <div class="envelope-pocket"></div>
+
+                        <div class="letter-card flex flex-col justify-center items-center text-center">
+                            <span class="text-indigo-500 text-2xl">🎓</span>
+                            <p class="font-dancing text-indigo-800 text-lg mt-1">Mở ra xem nhé...</p>
+                        </div>
+
+                        <div class="wax-seal" title="Nhấn để mở thư">
+                            <span>🎓</span>
+                        </div>
+                    </div>
+                    <div class="env-shadow"></div>
+                </div>
+
+                <button onclick="openEnvelope('grad')" class="cute-btn cute-btn-grad">
+                    <span class="cb-shine"></span>
+                    <span>Mở Thư Tốt Nghiệp</span>
+                    <span class="cb-ico">🎓</span>
+                </button>
+            </div>
+
+            <!-- ===== THƯ 2: 20/10 ===== -->
+            <div class="env-col">
+                <p class="env-tag env-tag-love"><span class="tag-ico">🌷</span><span>Chúc mừng ngày 20/10</span></p>
+
+                <div class="envelope-wrapper">
+                    <span class="stk stk-a" style="--d:.4s">💗</span>
+                    <span class="stk stk-b" style="--d:1.1s">🎀</span>
+                    <span class="stk stk-c" style="--d:1.9s">🌸</span>
+                    <span class="spk spk-1">✦</span><span class="spk spk-2">✧</span><span class="spk spk-3">✦</span>
+
+                    <div class="envelope" id="envelopeLove" onclick="openEnvelope('love')">
+                        <div class="envelope-flap"></div>
+                        <div class="envelope-pocket"></div>
+
+                        <div class="letter-card flex flex-col justify-center items-center text-center">
+                            <span class="text-rose-500 text-2xl">💌</span>
+                            <p class="font-dancing text-rose-800 text-lg mt-1">Mở ra xem nhé...</p>
+                        </div>
+
+                        <div class="wax-seal" title="Nhấn để mở thư">
+                            <span>❤️</span>
+                        </div>
+                    </div>
+                    <div class="env-shadow"></div>
+                </div>
+
+                <button onclick="openEnvelope('love')" class="cute-btn cute-btn-love">
+                    <span class="cb-shine"></span>
+                    <span>Mở Thư 20/10</span>
+                    <span class="cb-ico">💌</span>
+                </button>
+            </div>
+        </div>
+
+        <p class="env-hint"><span>👆</span> Chọn một phong thư để mở nhé <span>💕</span></p>
+    </div>
+
+    <!-- ==================================================
+         THƯ MỪNG TỐT NGHIỆP — mở ra như một buổi chiếu phim
+         Ảnh: images/tot-nghiep-1.jpg ... tot-nghiep-8.jpg
+         - Ảnh số 1 là khung lớn ở đầu cuộn film. Thiếu ảnh nào, khung đó tự ẩn.
+         - Muốn thêm ảnh: sao chép cả một khối <figure class="gm-frame">...</figure>
+         ================================================== -->
+    <div id="grad-modal" class="expanded-letter gm" role="dialog" aria-label="Thư mừng tốt nghiệp">
+        <button class="gm-close" onclick="closeLetter()" aria-label="Đóng thư">✕</button>
+
+        <section class="gm-stage">
+            <div class="gm-beam"></div>
+            <div class="gm-search gm-search-l"></div>
+            <div class="gm-search gm-search-r"></div>
+            <div class="gm-flare"></div>
+            <div class="gm-title">
+                <h2>Chúc mừng<br>Viễn tốt nghiệp</h2>
+                <p class="gm-sub">Một lá thư và một thước phim nhỏ, anh dành riêng cho Viễn.</p>
+            </div>
+            <div class="gm-curtain gm-curtain-l"></div>
+            <div class="gm-curtain gm-curtain-r"></div>
+            <div class="gm-valance"></div>
+            <span class="gm-scroll" aria-hidden="true"></span>
+        </section>
+
+        <section class="gm-letter">
+            <p class="gm-hello">Gửi Viễn,</p>
+            <p>Chúc mừng Viễn đã chính thức tốt nghiệp đại học! Tui biết phía sau ngày hôm nay là biết bao đêm thức khuya, những lần áp lực, và cả những lúc em muốn dừng lại nhưng vẫn cố gắng đi tiếp.</p>
+            <p>Tấm bằng này không chỉ là một tờ giấy, mà là cả quãng thời gian đại học với bao nhiêu nỗ lực. Hơi trễ nhưng mà này là món quà tui làm cho bà nha, quà như này cũng được mà đúng không -.-</p>
+            <p class="gm-quote">"Chúc ai đó bước sang chương mới thật rực rỡ: công việc suôn sẻ, ước mơ thành hiện thực, và luôn giữ nụ cười như hôm nay. Tui vẫn luôn ở bên cổ vũ nha. Hehe! Tui đợi bà mời tui mà kh có 😔."</p>
+            <p class="gm-sign">Kiên</p>
+        </section>
+
+        <section class="gm-gallery">
+            <h3>Khoảnh khắc tốt nghiệp</h3>
+            <p class="gm-hint">Chạm vào một khung hình để xem lớn.</p>
+            <div class="gm-actions">
+                <!-- 🎬 Nút chiếu phim: bảng đèn rạp + cuộn film xoay + sóng sáng lan tỏa -->
+                <button class="gm-play" onclick="playSlideshow(this)" aria-label="Xem như một thước phim">
+                    <span class="gp-bulbs" aria-hidden="true"></span>
+                    <span class="gp-ring gp-ring-a" aria-hidden="true"></span>
+                    <span class="gp-ring gp-ring-b" aria-hidden="true"></span>
+                    <span class="gp-face">
+                        <span class="gp-reel" aria-hidden="true">
+                            <svg viewBox="0 0 64 64">
+                                <circle cx="32" cy="32" r="30" fill="#1b1458" stroke="#ffe0a0" stroke-width="2.4"/>
+                                <circle cx="32" cy="32" r="25" fill="none" stroke="rgba(255,224,160,.35)" stroke-width="1"/>
+                                <circle cx="49" cy="32" r="5.4" fill="#0d0a2e"/><circle cx="40.5" cy="47.6" r="5.4" fill="#0d0a2e"/><circle cx="23.5" cy="47.6" r="5.4" fill="#0d0a2e"/><circle cx="15" cy="32" r="5.4" fill="#0d0a2e"/><circle cx="23.5" cy="16.4" r="5.4" fill="#0d0a2e"/><circle cx="40.5" cy="16.4" r="5.4" fill="#0d0a2e"/>
+                            </svg>
+                            <i class="gp-tri"></i>
+                        </span>
+                        <span class="gp-text">
+                            <b>Xem như một thước phim</b>
+                            <small>Bắt đầu buổi chiếu riêng</small>
+                        </span>
+                        <span class="gp-shine" aria-hidden="true"></span>
+                    </span>
+                </button>
+                <button class="gm-btn" onclick="celebrate('grad', true)">Tung mũ</button>
+            </div>
+
+
+            <div id="gradGallery">
+                <figure class="gm-frame gm-lead" data-required="true"
+                    tabindex="0" onclick="openLightbox(this)"
+                    onkeydown="if(event.key==='Enter')openLightbox(this)">
+                    <img src="images/tot-nghiep-1.jpg" alt="Ảnh tốt nghiệp 1" onerror="photoMissing(this)">
+                    <span class="gm-missing">Thêm ảnh tot-nghiep-1.jpg<br>vào thư mục images</span>
+                    <figcaption>Ngày trọng đại 🌸</figcaption>
+                </figure>
+
+                <div class="gm-reel">
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-2.jpg" alt="Ảnh tốt nghiệp 2" onerror="photoMissing(this)">
+                        <figcaption>Nụ cười tỏa nắng 🌷</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-3.jpg" alt="Ảnh tốt nghiệp 3" onerror="photoMissing(this)">
+                        <figcaption>Niềm tự hào 💗</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-4.jpg" alt="Ảnh tốt nghiệp 4" onerror="photoMissing(this)">
+                        <figcaption>Gia đình 🎓</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-5.jpg" alt="Ảnh tốt nghiệp 5" onerror="photoMissing(this)">
+                        <figcaption>Cử nhân xinh đẹp 🌹</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-6.jpg" alt="Ảnh tốt nghiệp 6" onerror="photoMissing(this)">
+                        <figcaption>Một hành trình đáng nhớ ✨</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-7.jpg" alt="Ảnh tốt nghiệp 7" onerror="photoMissing(this)">
+                        <figcaption>Chặng đường mới bắt đầu 💐</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-8.jpg" alt="Ảnh tốt nghiệp 8" onerror="photoMissing(this)">
+                        <figcaption>Mãi rạng rỡ nhé 🌼</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-9.jpg" alt="Ảnh tốt nghiệp 9" onerror="photoMissing(this)">
+                        <figcaption>Thanh xuân rực rỡ 💖</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-10.jpg" alt="Ảnh tốt nghiệp 10" onerror="photoMissing(this)">
+                        <figcaption>Nỗ lực được đền đáp 🎓</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-11.jpg" alt="Ảnh tốt nghiệp 11" onerror="photoMissing(this)">
+                        <figcaption>Một tương lai thật rực rỡ 🌸</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-12.jpg" alt="Ảnh tốt nghiệp 12" onerror="photoMissing(this)">
+                        <figcaption>Ước mơ thành hiện thực ✨</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-13.jpg" alt="Ảnh tốt nghiệp 13" onerror="photoMissing(this)">
+                        <figcaption>Khoảnh khắc tuyệt vời 🌷</figcaption>
+                    </figure>
+                    <figure class="gm-frame" tabindex="0" onclick="openLightbox(this)" onkeydown="if(event.key==='Enter')openLightbox(this)">
+                        <img src="images/tot-nghiep-14.jpg" alt="Ảnh tốt nghiệp 14" onerror="photoMissing(this)">
+                        <figcaption>Lưu giữ những kỷ niệm 💕</figcaption>
+                    </figure>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="gm-end">
+            <button class="gm-btn gm-btn-gold" onclick="sendWishes('grad', this)">Gửi ngàn lời chúc</button>
+            <button class="gm-btn" onclick="closeLetter()">Thu lại thư</button>
+        </section>
+    </div>
+
+    <!-- ==================================================
+         THƯ 20/10 (nội dung như ban đầu)
+         ================================================== -->
+    <div id="letter-modal" class="expanded-letter lm" role="dialog" aria-label="Thư 20/10">
+        <div class="lm-petals" aria-hidden="true"></div>
+        <div class="lm-glow" aria-hidden="true"></div>
+
+        <article class="lm-card">
+            <button class="lm-mute" onclick="loveMuteToggle()" aria-label="Tắt nhạc">🔊</button>
+            <button class="lm-close" onclick="closeLetter()" aria-label="Đóng thư">✕</button>
+
+            <h2 class="lm-title">Gửi Viễn,</h2>
+
+            <div class="lm-body">
+                <!-- Ảnh Polaroid: đặt file anh-20-10.jpg cùng thư mục -->
+                <figure class="polaroid single lm-polaroid" data-required="true">
+                    <span class="lm-tape" aria-hidden="true"></span>
+                    <div class="lm-pic">
+                        <img src="images/anh-20-10.jpg" onerror="photoMissing(this)" alt="Ảnh cô gái">
+                        <div class="photo-placeholder"><span>📷</span><p>Thêm ảnh vào đây<br><small>anh-20-10.jpg</small></p></div>
+                    </div>
+                    <figcaption>Xinh rạng rỡ nhất</figcaption>
+                    <span class="lm-heart" aria-hidden="true">💖</span>
+                </figure>
+
+                <div class="lm-text">
+                    <p>
+                        Hôm nay là một ngày thật đặc biệt, mong rằng những điều tốt đẹp nhất
+                        sẽ đến với một người vô cùng đáng quý. Chúc cho mỗi ngày đều ngập tràn
+                        niềm vui, nụ cười và những khoảnh khắc hạnh phúc. 🌷
+                    </p>
+
+                    <p>
+                        Cảm ơn vì đã xuất hiện và mang đến những điều thật dịu dàng.
+                        Mong rằng dù cuộc sống có bận rộn hay khó khăn đến đâu, vẫn luôn
+                        giữ được nụ cười, sự tự tin và niềm tin vào những điều tốt đẹp. 💐
+                    </p>
+
+                    <p class="lm-quote">
+                        "Chúc cho những ngày tháng phía trước luôn rực rỡ như hoa,
+                        ngọt ngào như nắng và ngập tràn yêu thương.
+                        Mong mọi ước mơ đều thành hiện thực và hạnh phúc sẽ luôn
+                        ở bên mỗi ngày. Vẫn chờ nhé! ❤️🌸✨. "
+                    </p>
+                </div>
+
+            </div>
+
+            <footer class="lm-foot">
+                <button class="lm-btn" onclick="closeLetter()">Thu lại thư</button>
+                <button class="lm-send" onclick="sendWishes('love', this)">
+                    <span class="ls-ring" aria-hidden="true"></span>
+                    <span class="ls-heart" aria-hidden="true">❤️</span>
+                    <span class="ls-text">Gửi ngàn tim</span>
+                </button>
+            </footer>
+        </article>
+    </div>
+
+    <!-- Phóng to ảnh: chuyển ảnh, vuốt, trình chiếu -->
+    <div id="lightbox" class="lightbox fixed inset-0 z-[55] flex flex-col items-center justify-center p-4 bg-indigo-950/80 backdrop-blur-md" onclick="closeLightbox()">
+        <span class="lb-counter" id="lbCounter"></span>
+        <button class="lb-close" onclick="event.stopPropagation(); closeLightbox()" title="Đóng">✕</button>
+
+        <div class="lb-stage" onclick="event.stopPropagation()">
+            <button class="lb-nav lb-prev" onclick="stepLightbox(-1)" title="Ảnh trước">‹</button>
+            <img id="lightboxImg" src="" alt="">
+            <button class="lb-nav lb-next" onclick="stepLightbox(1)" title="Ảnh sau">›</button>
+        </div>
+
+        <p id="lightboxCap" class="font-dancing text-white text-2xl sm:text-3xl mt-4 text-center"></p>
+        <button id="lbPlay" class="lb-play" onclick="event.stopPropagation(); toggleSlideshow()">🎬 Chiếu như phim</button>
+                <p class="text-white/50 text-xs mt-3">Nhấn ngoài ảnh hoặc Esc để đóng · ← → để chuyển ảnh</p>
+    </div>
+
+    <!-- 🎞️ CINEMA: trình chiếu như cuộn film (nội dung do script.js dựng) -->
+    <div id="cinema" class="cinema">
+        <div class="cin-stage" id="cinStage" onclick="cinToggle()"></div>
+        <div class="cin-fx"><i class="fx-grain"></i><i class="fx-flick"></i><i class="fx-scratch"></i><i class="fx-vig"></i><i class="fx-leak" id="cinLeak"></i></div>
+        <div class="cin-top">
+            <div class="cin-hud"><span class="cin-spool">🎞️</span><span class="cin-rec">● REC</span><span id="cinTime">00:00:00</span></div>
+            <div class="cin-ttl">Graduation Day · 30/09/2026</div>
+            <div class="cin-hud"><span id="cinCount"></span><button class="cin-x" onclick="closeCinema()" title="Đóng">✕</button></div>
+        </div>
+        <div class="cin-bottom">
+            <div class="cin-reel"><div class="reel-track" id="cinTrack"></div><span class="cin-gate"></span></div>
+            <div class="cin-ctrl">
+                <button onclick="cinStep(-1)" title="Ảnh trước">⏮</button>
+                <button id="cinPP" onclick="cinToggle()" title="Phát / Dừng">⏸</button>
+                <button onclick="cinStep(1)" title="Ảnh sau">⏭</button>
+                <div class="cin-tl" id="cinTimeline"></div>
+                <button onclick="cinMute(this)" title="Bật / tắt nhạc">🔊</button>
+            </div>
+        </div>
+        <div class="cin-leader" id="cinLeader"><div class="cin-ring"><b id="cinNum">3</b></div></div>
+        <div class="cin-title" id="cinTitle"></div>
+        <div class="cin-end" id="cinEnd"></div>
+        <div class="cin-toast" id="cinToast"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
