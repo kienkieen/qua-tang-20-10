@@ -2593,3 +2593,71 @@ html.lite .env-shadow { animation: none; }
 
 /* Sao lấp lánh: chỉ cần opacity + scale, bỏ text-shadow (đã có ở khối trên) */
 html.lite .tstar { text-shadow: none; }
+
+
+/* =====================================================================
+   🎓🎬 THƯ TỐT NGHIỆP + CINEMA MƯỢT (v3)
+   ---------------------------------------------------------------------
+   • Ảnh thư viện nạp theo kiểu thu nhỏ (script.js: PH) -> khung giữ chỗ + hiện dần khi nạp xong
+   • Khi đang chiếu phim: tạm dừng + ẩn thư phía sau (trước đây vẫn chạy ngầm sau lớp phim)
+   • Điện thoại (html.lite): bỏ các animation chạy trên main-thread (đổi background-position,
+     box-shadow, filter blur...) và giảm bóng đổ khổng lồ
+   ===================================================================== */
+
+/* Ảnh chưa nạp xong: giữ chỗ, không hiện chữ alt, rồi hiện dần khi có ảnh */
+#gradGallery img:not([src]) { opacity: 0 !important; }
+#gradGallery .gm-lead img:not([src]) { aspect-ratio: 4 / 5; width: 100%; }
+
+/* Đang chiếu phim: thư phía sau không cần vẽ / chạy gì cả */
+body.cin-open #grad-modal { visibility: hidden; }
+body.cin-open #grad-modal *,
+body.cin-open #grad-modal::before,
+body.cin-open #grad-modal::after { animation-play-state: paused !important; }
+
+/* ---------- Điện thoại / máy yếu ---------- */
+
+/* Dải film 2 bên: animate background-position = phải vẽ lại mỗi khung hình (main-thread) -> để tĩnh */
+html.lite #grad-modal .gm-gallery::before,
+html.lite #grad-modal .gm-end::before { animation: none; box-shadow: none; }
+
+/* Nền sao nhấp nháy toàn màn hình + quầng sáng blur sau nút chiếu phim */
+html.lite #grad-modal::after { animation: none; opacity: .8; }
+html.lite #grad-modal .gm-actions::before { animation: none; filter: none; opacity: .7; }
+
+/* Nút "Xem như một thước phim": bỏ hiệu ứng vẽ lại liên tục (box-shadow lan toả, drop-shadow + nhấp nháy bóng đèn) */
+html.lite .gp-ring { display: none; }
+html.lite .gp-bulbs { filter: none; }
+html.lite .gp-bulbs::before,
+html.lite .gp-bulbs::after { animation: none; }
+html.lite .gp-shine { display: none; }
+
+/* Bóng đổ cực lớn -> nhỏ lại (bóng blur lớn là phần tốn GPU nhất khi cuộn) */
+html.lite #grad-modal .gm-curtain { box-shadow: 0 0 28px rgba(5, 6, 50, .8); }
+html.lite #grad-modal .gm-valance { box-shadow: 0 4px 10px rgba(5, 6, 50, .6); }
+html.lite #grad-modal .gm-letter { box-shadow: 0 0 0 5px rgba(255, 255, 255, .25), 0 18px 30px -18px rgba(15, 20, 120, .7); }
+html.lite #grad-modal .gm-letter::after { animation: none; filter: none; }
+html.lite #grad-modal .gm-frame,
+html.lite #grad-modal .gm-reel .gm-frame {
+    box-shadow: 0 10px 20px -10px rgba(4, 4, 36, .8), 0 0 0 1px rgba(255, 217, 138, .3);
+    transition: none;
+}
+html.lite #grad-modal .gm-lead { box-shadow: 0 14px 28px -12px rgba(4, 4, 36, .85), 0 0 0 1px rgba(255, 217, 138, .4); }
+html.lite #grad-modal .gm-gallery h3 { filter: none; text-shadow: 0 3px 0 rgba(30, 20, 110, .5), 0 0 18px rgba(255, 190, 110, .4); }
+
+/* Cinema: cuộn film không dùng mask-image (mask trên phần tử đang trượt rất tốn) -> thay bằng 2 dải mờ tĩnh */
+html.lite .cin-reel { -webkit-mask-image: none; mask-image: none; }
+html.lite .cin-reel::before,
+html.lite .cin-reel::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 14%; z-index: 3; pointer-events: none;
+}
+html.lite .cin-reel::before { left: 0;  background: linear-gradient(90deg, #000, transparent); }
+html.lite .cin-reel::after  { right: 0; background: linear-gradient(270deg, #000, transparent); }
+html.lite .reel-track { transition-duration: .6s; }
+html.lite .reel-cell { transition: opacity .3s; background: #15100c; }
+html.lite .reel-cell.on { transform: none; outline: 2px solid #f6c453; box-shadow: none; }
+
+/* Cinema: chuyển cảnh ngắn hơn -> ít lúc phải vẽ 2 ảnh lớn chồng nhau; vệt cháy film nhỏ lại */
+html.lite .cin-slide { animation-duration: .9s; }
+html.lite .cin-slide.out { transition-duration: .9s; }
+html.lite .fx-leak { inset: 0; }
+html.lite .cin-frame::after { display: none; }

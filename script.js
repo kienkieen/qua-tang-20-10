@@ -69,7 +69,7 @@ function openEnvelope(type = "love") {
     setTimeout(() => playChime(783.99, 0.2), 300);     // G5
     if (type === "grad") setTimeout(() => playChime(1046.5, 0.4), 480); // C6
 
-    triggerHeartBurst(type);
+    triggerHeartBurst(type, LITE ? 10 : 25);
 
     // Sau khi phong thư mở, chuyển mượt sang lá thư lớn
     setTimeout(() => {
@@ -160,11 +160,133 @@ function photoMissing(img) {
 }
 
 // =====================================================
+// 🖼️ KHO ẢNH: thu nhỏ ảnh gốc MỘT LẦN rồi dùng bản nhỏ cho mọi nơi
+//   Vấn đề cũ: ảnh tốt nghiệp là ảnh gốc từ điện thoại (vài MB, hàng chục
+//   triệu điểm ảnh). Thư viện, lightbox, cuộn film và 2 lớp nền của mỗi
+//   khung phim đều giải mã LẠI ảnh gốc -> tốn RAM, nghẽn CPU -> load lâu, giật.
+//   Cách mới:
+//     • mỗi ảnh gốc chỉ được tải + giải mã 1 lần (lần lượt, từng ảnh một)
+//     • tạo bản "xem" (cạnh dài ~1280px) + bản "thumb" (240px) và lưu lại
+//     • thư viện / lightbox / phim dùng bản xem; cuộn film dùng thumb
+//   Nếu trình duyệt chặn canvas (vd mở file bằng file://) thì tự dùng ảnh gốc như cũ.
+// =====================================================
+const PH = (() => {
+    const MAX = LITE ? 1280 : 1920;     // cạnh dài tối đa của bản "xem"
+    const THUMB = 240;                  // cạnh dài của thumb cuộn film
+    const LIMIT = LITE ? 1 : 2;         // số ảnh xử lý cùng lúc
+    const done = new Map();             // src -> kết quả
+    const jobs = new Map();             // src -> công việc đang chờ / đang chạy
+    const queue = [];
+    let running = 0;
+
+    const loadImg = (src) => new Promise((res, rej) => {
+        const im = new Image();
+        im.decoding = "async";
+        im.onload = () => res(im);
+        im.onerror = () => rej(new Error("load"));
+        im.src = src;
+    });
+    const toUrl = (cv, q) => new Promise((res, rej) =>
+        cv.toBlob((b) => (b ? res(URL.createObjectURL(b)) : rej(new Error("blob"))), "image/jpeg", q));
+
+    async function build(src) {
+        let im;
+        try { im = await loadImg(src); } catch (e) { return { missing: true }; }
+        try {
+            if (im.decode) { try { await im.decode(); } catch (e) {} }
+            const nw = im.naturalWidth, nh = im.naturalHeight;
+            if (!nw || !nh) return { missing: true };
+            const k = Math.min(1, MAX / Math.max(nw, nh));
+            const w = Math.max(1, Math.round(nw * k)), h = Math.max(1, Math.round(nh * k));
+            const cv = document.createElement("canvas");
+            cv.width = w; cv.height = h;
+            const cx = cv.getContext("2d");
+            cx.imageSmoothingQuality = "high";
+            cx.drawImage(im, 0, 0, w, h);
+            const view = k < 1 ? await toUrl(cv, 0.82) : src;       // ảnh vốn đã nhỏ thì dùng luôn
+            const t = Math.min(1, THUMB / Math.max(w, h));
+            const tc = document.createElement("canvas");
+            tc.width = Math.max(1, Math.round(w * t)); tc.height = Math.max(1, Math.round(h * t));
+            const tx = tc.getContext("2d");
+            tx.imageSmoothingQuality = "high";
+            tx.drawImage(cv, 0, 0, tc.width, tc.height);
+            const thumb = await toUrl(tc, 0.7);
+            cv.width = cv.height = tc.width = tc.height = 0;         // trả bộ nhớ canvas ngay
+            return { view, thumb, w, h };
+        } catch (e) {
+            return { orig: true };                                    // canvas bị chặn -> dùng ảnh gốc như cũ
+        } finally {
+            im.onload = im.onerror = null;
+        }
+    }
+
+    function pump() {
+        while (running < LIMIT && queue.length) {
+            const j = queue.shift();
+            running++;
+            build(j.src)
+                .catch(() => ({ orig: true }))
+                .then((r) => { done.set(j.src, r); j.res(r); })
+                .finally(() => { jobs.delete(j.src); running--; setTimeout(pump, LITE ? 40 : 10); });   // nghỉ một nhịp cho trình duyệt vẽ
+        }
+    }
+
+    function ensure(src, urgent) {
+        if (!src) return Promise.resolve({ missing: true });
+        if (done.has(src)) return Promise.resolve(done.get(src));
+        let j = jobs.get(src);
+        if (!j) {
+            j = { src };
+            j.p = new Promise((r) => { j.res = r; });
+            jobs.set(src, j);
+            queue.push(j);
+        }
+        if (urgent) {                                                 // ảnh đang cần ngay -> chen lên đầu hàng
+            const k = queue.indexOf(j);
+            if (k > 0) { queue.splice(k, 1); queue.unshift(j); }
+        }
+        pump();
+        return j.p;
+    }
+    return { ensure, peek: (s) => done.get(s) };
+})();
+
+// đường dẫn ảnh gốc của một khung (ảnh thư viện lưu trong data-src)
+const photoSrc = (fig) => {
+    const im = fig && fig.querySelector("img");
+    return im ? (im.dataset.src || im.getAttribute("src") || "") : "";
+};
+
+async function loadPhoto(im, urgent) {
+    const src = im.dataset.src;
+    if (!src || im.dataset.done) return;
+    const r = await PH.ensure(src, urgent);
+    if (im.dataset.done) return;
+    im.dataset.done = "1";
+    if (r.missing) { photoMissing(im); return; }                     // ảnh thiếu: giữ cơ chế ẩn / hiện khung gợi ý như cũ
+    im.src = r.orig ? src : r.view;
+}
+
+// Chỉ nạp ảnh khi sắp cuộn tới (chứ không nạp cả 14 ảnh ngay khi mở thư)
+let photoIO = null;
+function setupGalleryPhotos(modalEl) {
+    const imgs = [...modalEl.querySelectorAll("img[data-src]")];
+    if (!imgs.length) return;
+    if (!("IntersectionObserver" in window)) { imgs.forEach((im) => loadPhoto(im, false)); return; }
+    if (photoIO) photoIO.disconnect();
+    photoIO = new IntersectionObserver((es) => es.forEach((e) => {
+        if (e.isIntersecting) { photoIO.unobserve(e.target); loadPhoto(e.target, true); }
+    }), { root: modalEl, rootMargin: LITE ? "900px 0px" : "1400px 0px" });
+    imgs.forEach((im) => { if (!im.dataset.done) photoIO.observe(im); });
+}
+
+// =====================================================
 // GALLERY: hiện dần khi cuộn, nghiêng 3D theo chuột
 // =====================================================
 let revealIO = null;
 
 function prepareGalleryReveal(modalEl) {
+    setupGalleryPhotos(modalEl);                            // nạp ảnh thư viện theo kiểu thu nhỏ, đúng lúc cần
     if (window.gmPrepareLetter) gmPrepareLetter(modalEl);   // chữ trong thư hiện dần (xem cuối file)
     if (revealIO) revealIO.disconnect();
     const cards = modalEl.querySelectorAll(".gm-frame");
@@ -258,7 +380,14 @@ function renderLightbox(dir) {
     const src = fig.querySelector("img");
     const img = document.getElementById("lightboxImg");
 
-    img.src = src.currentSrc || src.src;
+    const known = src.currentSrc || src.src;
+    if (known) img.src = known;                                       // bản xem đã nạp sẵn (blob nhỏ)
+    else {                                                            // chưa nạp -> nạp ngay rồi mới hiện
+        img.removeAttribute("src");
+        loadPhoto(src, true).then(() => {
+            if (lbItems[lbIndex] === fig) img.src = src.currentSrc || src.src;
+        });
+    }
     img.style.setProperty("--dir", dir || 1);
     img.classList.remove("swap");
     void img.offsetWidth;            // khởi động lại animation
@@ -495,7 +624,7 @@ function tick(now) {
 }
 
 function celebrate(type, big = false) {
-    const n = (reduceMotion ? 0.25 : 1) * (LITE ? 0.6 : 1);
+    const n = (reduceMotion ? 0.25 : 1) * (LITE ? 0.4 : 1);
 
     if (type === "grad") {
         cannon("grad", 0, H, 62, 44, Math.round(70 * n), 26);
@@ -599,7 +728,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // Ảnh nào đã lỗi từ trước khi script này chạy thì xử lý bù
     document.querySelectorAll("img[onerror]").forEach((img) => {
-        if (img.complete && img.naturalWidth === 0) photoMissing(img);
+        // ảnh thư viện chưa có src (nạp sau bằng data-src) thì "complete" luôn = true -> không phải ảnh lỗi
+        if (img.getAttribute("src") && img.complete && img.naturalWidth === 0) photoMissing(img);
     });
 
     // Hiệu ứng cho từng ảnh trong gallery
@@ -820,7 +950,7 @@ function openCinema(start = 0, intro = true) {
     if (!items.length) return;
     closeLightbox();
     cancelAnimationFrame(cin.raf);
-    cin = { on: true, items, i: start, t: 0, total: 0, playing: false, ended: false, raf: 0, last: 0, token: cin.token + 1 };
+    cin = { on: true, items, i: start, t: 0, total: 0, playing: false, ended: false, raf: 0, last: 0, token: cin.token + 1, loading: false };
     const tok = cin.token, el = $c("cinema");
     el.className = "cinema show" + (reduceMotion ? " calm" : "");
     document.body.classList.add("cin-open");
@@ -828,10 +958,12 @@ function openCinema(start = 0, intro = true) {
     $c("cinStage").innerHTML = "";
     $c("cinEnd").classList.remove("show");
     $c("cinTitle").innerHTML = `<small>${CINEMA.subtitle}</small><h2>${CINEMA.title}</h2>`;
+    // Cuộn film: tạo ô trống trước, thumb nhỏ được gắn dần (không giải mã ảnh gốc thêm lần nào nữa)
     $c("cinTrack").innerHTML = items.map((f, j) =>
-        `<button class="reel-cell" data-n="${String(j + 1).padStart(2, "0")}" onclick="cinGo(${j})"><img src="${f.querySelector("img").currentSrc || f.querySelector("img").src}" alt="" loading="lazy" decoding="async"></button>`).join("");
+        `<button class="reel-cell" data-n="${String(j + 1).padStart(2, "0")}" onclick="cinGo(${j})"><img alt="" decoding="async"></button>`).join("");
     $c("cinTimeline").innerHTML = items.map((f, j) => `<i onclick="cinGo(${j})"><b></b></i>`).join("");
     startSlideshowMusic();
+    cinPrepare(tok);          // chuẩn bị ảnh ngay trong lúc đếm ngược 3-2-1
 
     (async () => {
         const ok = () => cin.token === tok && cin.on;
@@ -860,20 +992,68 @@ function openCinema(start = 0, intro = true) {
     })();
 }
 
+// Xếp hàng xử lý ảnh theo thứ tự sẽ chiếu, rồi gắn thumb vào cuộn film khi xong từng ảnh
+function cinPrepare(tok) {
+    const n = cin.items.length, first = cin.i;
+    for (let k = 0; k < n; k++) {
+        const j = (first + k) % n, src = photoSrc(cin.items[j]);
+        PH.ensure(src, k === 0).then((r) => {
+            if (cin.token !== tok) return;
+            const im = document.querySelectorAll(".reel-cell img")[j];
+            if (!im || r.missing) return;
+            im.src = r.thumb || src;
+        });
+    }
+}
+
 function showSlide(i, dir = 1) {
     const n = cin.items.length;
     cin.i = (i + n) % n; cin.t = 0; cin.ended = false;
     $c("cinEnd").classList.remove("show");
 
-    const fig = cin.items[cin.i], im = fig.querySelector("img");
+    const idx = cin.i, tok = cin.token, fig = cin.items[idx], src = photoSrc(fig);
+
+    // cuộn film trượt để khung hiện tại nằm giữa (làm ngay, không chờ ảnh)
+    const cells = [...document.querySelectorAll(".reel-cell")];
+    cells.forEach((c, j) => c.classList.toggle("on", j === idx));
+    const c = cells[idx], vw = $c("cinTrack").parentElement.clientWidth;
+    if (c) $c("cinTrack").style.transform = `translateX(${vw / 2 - (c.offsetLeft + c.offsetWidth / 2)}px)`;
+
+    [...$c("cinTimeline").children].forEach((e, j) => { e.firstChild.style.transform = "scaleX(" + (j < idx ? 1 : 0) + ")"; });
+    $c("cinCount").textContent = String(idx + 1).padStart(2, "0") + " / " + String(n).padStart(2, "0");
+
+    // nạp trước 2 ảnh kế tiếp (đã thu nhỏ) để chuyển cảnh không bị khựng
+    for (let k = 1; k <= 2; k++) PH.ensure(photoSrc(cin.items[(idx + k) % n]), false);
+    const nr = PH.peek(photoSrc(cin.items[(idx + 1) % n]));
+    if (nr && nr.view) { const pre = new Image(); pre.decoding = "async"; pre.src = nr.view; if (pre.decode) pre.decode().catch(() => {}); }
+
+    const r = PH.peek(src);
+    if (r) { cin.loading = false; mountSlide(fig, r, idx, tok); return; }
+
+    // ảnh chưa sẵn sàng: tạm dừng đồng hồ phim, chờ ảnh (không để màn hình đen / giật)
+    cin.loading = true;
+    const wt = setTimeout(() => { if (cin.token === tok && cin.loading && cin.i === idx) cinToast("Đang nạp ảnh…"); }, 600);
+    PH.ensure(src, true).then((rr) => {
+        clearTimeout(wt);
+        if (cin.token !== tok || !cin.on || cin.i !== idx) return;
+        cin.loading = false;
+        mountSlide(fig, rr, idx, tok);
+    });
+}
+
+function mountSlide(fig, r, idx, tok) {
+    if (r.missing) { cin.t = CINEMA.slideMs; return; }                // ảnh hỏng: bỏ qua, sang ảnh kế
+    const orig = photoSrc(fig);
+    const url = r.orig ? orig : r.view;
+    const bg = r.thumb || url;                                         // nền mờ dùng thumb 240px: giống blur mà gần như không tốn
     const cap = ((fig.querySelector("figcaption") || {}).textContent || "").trim();
-    const k = cin.i % 2 ? -1 : 1;                    // xoay hướng zoom xen kẽ cho đỡ nhàm
+    const k = idx % 2 ? -1 : 1;                                        // xoay hướng zoom xen kẽ cho đỡ nhàm
+    const z = LITE ? [1.06, 1.12] : [1.1, 1.2];
 
     const s = document.createElement("div");
     s.className = "cin-slide";
-    s.style.cssText = `--s1:${rand(1.1, 1.2).toFixed(3)};--x:${(k * rand(1, 2.5)).toFixed(2)}%;--y:${rand(-1.5, 1.5).toFixed(2)}%;--dur:${CINEMA.slideMs + 1400}ms`;
-    const srcUrl = im.currentSrc || im.src;
-    s.innerHTML = `<img class="cin-bg" src="${srcUrl}" alt="" decoding="async"><div class="cin-center"><div class="cin-frame"><img class="cin-pic" src="${srcUrl}" alt="" decoding="async"></div><p class="cin-cap"></p></div>`;
+    s.style.cssText = `--s1:${rand(z[0], z[1]).toFixed(3)};--x:${(k * rand(1, 2.5)).toFixed(2)}%;--y:${rand(-1.5, 1.5).toFixed(2)}%;--dur:${CINEMA.slideMs + 1400}ms`;
+    s.innerHTML = `<img class="cin-bg" src="${bg}" alt="" decoding="async"><div class="cin-center"><div class="cin-frame"><img class="cin-pic" src="${url}" alt="" decoding="async"></div><p class="cin-cap"></p></div>`;
     const p = s.querySelector(".cin-cap");
     Array.from(cap).forEach((ch, j) => {
         const b = document.createElement("span");
@@ -881,34 +1061,30 @@ function showSlide(i, dir = 1) {
         p.appendChild(b);
     });
 
-    const st = $c("cinStage"), old = [...st.children];
-    st.appendChild(s);
-    old.forEach((o) => { o.classList.add("out"); setTimeout(() => o.remove(), 1400); });
-
-    const lk = $c("cinLeak");                        // lóe sáng "cháy film" khi chuyển cảnh
-    lk.classList.remove("go"); void lk.offsetWidth; lk.classList.add("go");
-    if (old.length) playTick();
-
-    // cuộn film trượt để khung hiện tại nằm giữa
-    const cells = [...document.querySelectorAll(".reel-cell")];
-    cells.forEach((c, j) => c.classList.toggle("on", j === cin.i));
-    const c = cells[cin.i], vw = $c("cinTrack").parentElement.clientWidth;
-    if (c) $c("cinTrack").style.transform = `translateX(${vw / 2 - (c.offsetLeft + c.offsetWidth / 2)}px)`;
-
-    [...$c("cinTimeline").children].forEach((e, j) => { e.firstChild.style.transform = "scaleX(" + (j < cin.i ? 1 : 0) + ")"; });
-    // nạp sẵn ảnh kế tiếp để chuyển cảnh không bị khựng
-    const nx = cin.items[(cin.i + 1) % n], nim = nx && nx.querySelector("img");
-    if (nim) { const pre = new Image(); pre.decoding = "async"; pre.src = nim.currentSrc || nim.src; }
-    $c("cinCount").textContent = String(cin.i + 1).padStart(2, "0") + " / " + String(n).padStart(2, "0");
+    const attach = () => {
+        if (cin.token !== tok || !cin.on || cin.i !== idx) return;
+        const st = $c("cinStage"), old = [...st.children];
+        st.appendChild(s);
+        old.forEach((o) => { o.classList.add("out"); setTimeout(() => o.remove(), 1400); });
+        const lk = $c("cinLeak");                                      // lóe sáng "cháy film" khi chuyển cảnh
+        lk.classList.remove("go"); void lk.offsetWidth; lk.classList.add("go");
+        if (old.length) playTick();
+    };
+    // giải mã ảnh xong rồi mới đưa lên màn hình -> không bị nháy / khựng khung hình đầu
+    const pic = s.querySelector(".cin-pic");
+    if (pic.decode) pic.decode().then(attach, attach); else attach();
 }
 
 function cinLoop(now) {
     if (!cin.on) return;
     const dt = Math.min(100, now - cin.last); cin.last = now;
-    if (cin.playing && !cin.ended) {
+    if (cin.playing && !cin.ended && !cin.loading) {
         cin.t += dt; cin.total += dt;
-        const b = $c("cinTimeline").children[cin.i];
-        if (b) b.firstChild.style.transform = "scaleX(" + Math.min(1, cin.t / CINEMA.slideMs).toFixed(3) + ")";
+        if (now - (cin.tl || 0) > 80) {                // thanh tiến độ chỉ cần cập nhật ~12 lần/giây
+            cin.tl = now;
+            const b = $c("cinTimeline").children[cin.i];
+            if (b) b.firstChild.style.transform = "scaleX(" + Math.min(1, cin.t / CINEMA.slideMs).toFixed(3) + ")";
+        }
         if (cin.t >= CINEMA.slideMs) cin.i === cin.items.length - 1 ? endFilm() : showSlide(cin.i + 1, 1);
     }
     if (now - (cin.clk || 0) > 90) {              // đồng hồ chỉ cần cập nhật ~11 lần/giây
@@ -1143,6 +1319,7 @@ function closeCinema() {
             layer.appendChild(d);
         };
         add("fx-flash");
+        if (LITE) return;       // điện thoại: bỏ chùm sáng blur + 2 vòng sóng phóng to x24 (rất nặng)
         add("fx-beam");
         add("fx-ring");
         add("fx-ring r2", `--rc:${type === "grad" ? "#ffd166" : "#ff7aa8"};`);
@@ -1193,9 +1370,11 @@ function closeCinema() {
 
         shockwave(cx, cy, type);
         const set = BURST_SET[type] || BURST_SET.love;
-        burst(cx, cy, 36, set, [100, 360]);
-        setTimeout(() => burst(cx, cy - 50, 24, set, [60, 280]), 220);
-        setTimeout(() => burst(cx, cy - 90, 18, set, [40, 220]), 480);
+        burst(cx, cy, LITE ? 14 : 36, set, [100, 360]);
+        if (!LITE) {
+            setTimeout(() => burst(cx, cy - 50, 24, set, [60, 280]), 220);
+            setTimeout(() => burst(cx, cy - 90, 18, set, [40, 220]), 480);
+        }
     };
 
     window.envelopeCloseFx = function () {
