@@ -1,3 +1,42 @@
+*,::before,::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}
+html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;-webkit-tap-highlight-color:transparent}
+body{margin:0;line-height:inherit}
+h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}
+p,h1,h2,h3,h4,h5,h6,figure,blockquote,pre,dl,dd,hr{margin:0}
+ol,ul{list-style:none;margin:0;padding:0}
+a{color:inherit;text-decoration:inherit}
+img,svg,video,canvas,audio,iframe{display:block;vertical-align:middle}
+img,video{max-width:100%;height:auto}
+button,input,select,textarea{font-family:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}
+button,select{text-transform:none}
+button,[type=button]{-webkit-appearance:button;background-color:transparent;background-image:none}
+button,[role=button]{cursor:pointer}
+[hidden]{display:none}
+::selection{background:#fbcfe8}
+
+.fixed{position:fixed}.absolute{position:absolute}
+.inset-0{inset:0}
+.z-0{z-index:0}.z-10{z-index:10}.z-50{z-index:50}.z-\[55\]{z-index:55}
+.flex{display:flex}.flex-col{flex-direction:column}
+.items-center{align-items:center}.justify-center{justify-content:center}
+.text-center{text-align:center}
+.pointer-events-none{pointer-events:none}.overflow-hidden{overflow:hidden}
+.rounded-full{border-radius:9999px}
+.p-4{padding:1rem}.py-8{padding-top:2rem;padding-bottom:2rem}
+.mt-1{margin-top:.25rem}.mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}
+.min-h-\[85vh\]{min-height:85vh}
+.text-xs{font-size:.75rem;line-height:1rem}
+.text-lg{font-size:1.125rem;line-height:1.75rem}
+.text-2xl{font-size:1.5rem;line-height:2rem}
+.text-white{color:#fff}.text-white\/50{color:rgba(255,255,255,.5)}
+.text-indigo-500{color:#6366f1}.text-indigo-800{color:#3730a3}
+.text-rose-500{color:#f43f5e}.text-rose-800{color:#9f1239}.text-rose-900{color:#881337}
+.bg-rose-200{background-color:#fecdd3}.bg-rose-300{background-color:#fda4af}
+.transition-all{transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}
+.duration-700{transition-duration:.7s}
+@media (min-width:640px){.sm\:text-3xl{font-size:1.875rem;line-height:2.25rem}}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem}
+
 body {
     font-family: 'Montserrat', sans-serif;
     background: linear-gradient(135deg, #fdf2f4 0%, #fae8eb 50%, #f7d6dc 100%);
@@ -205,7 +244,7 @@ body {
     transform: scale(0.8);
     opacity: 0;
     pointer-events: none;
-    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.6s ease;
 }
 
 .expanded-letter.show {
@@ -847,7 +886,7 @@ body {
 .cin-reel{position:relative;height:var(--strip);overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
 .reel-track{position:relative;display:flex;width:max-content;height:100%;padding:15px 50vw;box-sizing:border-box;transition:transform .9s cubic-bezier(.65,0,.25,1);
   background:var(--spr) repeat-x 0 4px,var(--spr) repeat-x 0 calc(100% - 4px),#1a1411}
-.reel-cell{position:relative;flex:none;width:var(--cw);height:var(--ch);margin:0 6px;padding:0;border:0;border-radius:2px;overflow:hidden;background:#000;cursor:pointer;opacity:.45;filter:sepia(.7) brightness(.8);transition:all .6s}
+.reel-cell{position:relative;flex:none;width:var(--cw);height:var(--ch);margin:0 6px;padding:0;border:0;border-radius:2px;overflow:hidden;background:#000;cursor:pointer;opacity:.45;filter:sepia(.7) brightness(.8);transition:opacity .5s,transform .5s,filter .5s}
 .reel-cell img{display:block;width:100%;height:100%;object-fit:cover}
 .reel-cell::after{content:attr(data-n);position:absolute;left:4px;bottom:2px;font:600 9px monospace;color:#f6c453;text-shadow:0 0 3px #000}
 .reel-cell.on{opacity:1;filter:none;transform:scale(1.1);outline:2px solid #f6c453;box-shadow:0 0 22px rgba(246,196,83,.5);z-index:2}
@@ -862,7 +901,7 @@ body {
 .cin-tl{flex:1;display:flex;gap:4px}
 .cin-tl i{flex:1;height:3px;border-radius:3px;overflow:hidden;background:#ffffff26;cursor:pointer;transition:height .2s}
 .cin-tl i:hover{height:6px}
-.cin-tl b{display:block;width:0;height:100%;background:linear-gradient(90deg,#f6c453,#f9a8d4)}
+.cin-tl b{display:block;width:100%;height:100%;background:linear-gradient(90deg,#f6c453,#f9a8d4);transform:scaleX(0);transform-origin:left center}
 
 .cin-leader,.cin-title,.cin-end{position:absolute;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;text-align:center}
 .cin-leader{inset:0;background:radial-gradient(#6b5a45,#2a211a);transition:opacity .3s}
@@ -2346,4 +2385,119 @@ body.grad-open #ambient { opacity: 0; }
     .lm-glow, .lm-card::before, .lm-heart, .ls-heart, .ls-ring, #letter-modal.show .lm-card { animation: none; }
     .lm-petals { display: none; }
     #letter-modal .gm-rv { opacity: 1; filter: none; transform: none; transition: none; }
+}
+
+/* =====================================================================
+   ⚡ TỐI ƯU HIỆU NĂNG (GitHub Pages / điện thoại)
+   Ý tưởng: bỏ blur/filter lớn, bỏ will-change thừa, dừng animation khi
+   không nhìn thấy, và giảm hiệu ứng nặng trên màn hình cảm ứng.
+   ===================================================================== */
+
+/* nền cố định gây repaint khi cuộn trên Android -> bỏ */
+body { background-attachment: scroll; }
+
+/* Aurora: thay blur(70px) bằng radial-gradient mềm sẵn (nhìn như cũ, nhẹ hơn rất nhiều) */
+.aurora { filter: none; }
+.au-1 { background: radial-gradient(closest-side, #ffb8d4 0%, rgba(255,184,212,.6) 45%, rgba(255,184,212,0) 100%); }
+.au-2 { background: radial-gradient(closest-side, #c9d4ff 0%, rgba(201,212,255,.6) 45%, rgba(201,212,255,0) 100%); }
+.au-3 { background: radial-gradient(closest-side, #ffd6bf 0%, rgba(255,214,191,.6) 45%, rgba(255,214,191,0) 100%); }
+
+/* mỗi hạt không cần là một layer riêng (animation tự nâng layer khi chạy) */
+.amb { will-change: auto; }
+.fx-p, .fx-trail { will-change: auto; }
+
+/* bụi sáng / quầng sáng: bỏ filter blur trên phần tử động */
+.gm-bokeh i { filter: none; }
+.gm-beam { filter: none; }
+.lm-glow { filter: none; }
+
+/* chữ trong thư: bỏ blur khi hiện (chỉ còn mờ -> rõ + trượt nhẹ, rẻ hơn nhiều) */
+#grad-modal .gm-letter .gm-rv,
+#letter-modal .gm-rv,
+#letter-modal .lm-text .gm-rv { filter: none; }
+#grad-modal .gm-letter .gm-rv.gm-in,
+#letter-modal .gm-rv.gm-in { filter: none; }
+
+/* chữ từng ký tự trong phụ đề cinema: bỏ filter trong keyframes */
+@keyframes capIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* thiệp 20/10 hiện ra: bỏ blur trong keyframes */
+@keyframes lmIn {
+    from { opacity: 0; transform: translateY(40px) scale(.96); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* tiêu đề thư tốt nghiệp: không animate letter-spacing (gây layout mỗi khung hình) / filter blur */
+@keyframes gmTitleX {
+    from { opacity: 0; transform: scale(1.12); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* nền ambient / lấp lánh: ẩn hẳn khi đã mở thư (JS thêm class body.has-letter) -> dừng toàn bộ animation phía sau */
+body.has-letter #ambient,
+body.has-letter #sparkles-container { display: none; }
+body.cin-open #hearts-container { display: none; }
+
+/* ảnh cinema nền + ảnh lớn: báo trước cho trình duyệt */
+.cin-pic { will-change: transform; }
+
+/* =====================================================================
+   📱 ĐIỆN THOẠI / MÀN CẢM ỨNG: giảm hiệu ứng nặng, giữ nguyên bố cục
+   ===================================================================== */
+@media (max-width: 820px), (pointer: coarse) {
+
+    /* chùm tia xoay khổng lồ (150vmax + mask) -> tĩnh và nhỏ hơn */
+    .rays { width: 110vmax; height: 110vmax; animation: none; will-change: auto; opacity: .35; }
+
+    /* sao lấp lánh: bỏ text-shadow kép */
+    .tstar { text-shadow: none; }
+    .shoot { filter: none; }
+
+    /* bong bóng: bỏ box-shadow nặng */
+    .amb.bubble { box-shadow: none; }
+
+    /* thư tốt nghiệp: bỏ blend-mode + đèn rọi khổng lồ, bỏ nhiễu SVG */
+    .gm-search { display: none; }
+    .gm-stage::after { display: none; }
+    #grad-modal.show .gm-title h2 { animation: gmTitleX 2.2s cubic-bezier(.2,.7,.1,1) 1.3s backwards; }  /* bỏ gmFoil chạy vô hạn */
+    #grad-modal .gm-title h2 { filter: drop-shadow(0 3px 0 rgba(30, 20, 110, .55)); }
+
+    /* backdrop-filter rất nặng trên GPU yếu -> bỏ, tăng nền đặc một chút */
+    .gm-close, #grad-modal .gm-btn, #grad-modal .gm-hint, .env-tag, .lb-nav, .lb-close,
+    .gm-play, .gm-play * {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+    }
+    .env-tag { background-color: rgba(255,255,255,.88); }
+    .gm-close { background: rgba(10, 6, 7, .8); }
+
+    /* màn chọn thư: bỏ blur khi chọn một phong thư */
+    #envelope-section.has-open .env-col { filter: none; }
+
+    /* ảnh trong thư viện: bỏ filter màu + blur khi hiện (filter trên 14 ảnh lớn rất tốn bộ nhớ) */
+    #grad-modal .gm-frame img,
+    .gm-frame img { filter: none; }
+    #grad-modal .gm-frame.pre img,
+    .gm-frame.pre img { opacity: 0; filter: none; }
+    #grad-modal .gm-frame:hover, #grad-modal .gm-frame:focus-visible { translate: 0 0; }
+
+    /* cinema: hạt film + nháy sáng + vệt xước (lớp 200% màn hình luôn chuyển động) -> tắt */
+    .fx-grain, .fx-flick, .fx-scratch { display: none; }
+    .cin-bg { filter: none; opacity: .38; }      /* thay cho blur(26px) trên ảnh full màn hình */
+    .reel-cell { filter: none; }
+    .reel-cell.on { box-shadow: 0 0 0 2px #f6c453; }
+    .cin-frame { box-shadow: 0 0 0 1px rgba(246,196,83,.45), 0 20px 40px #000; }
+
+    /* thiệp 20/10: bỏ viền động + bóng khổng lồ */
+    .lm-card::before { animation: none; }
+    .lm-card { box-shadow: 0 0 0 5px rgba(255,255,255,.12), 0 24px 50px -20px rgba(40,4,30,.9); }
+    .lm-glow { animation: none; opacity: .8; }
+
+    /* phong thư: bóng đổ + mờ nhẹ hơn */
+    .env-shadow { filter: none; opacity: .6; }
+}
+
+/* thiết bị yếu / người dùng bật tiết kiệm dữ liệu */
+@media (prefers-reduced-data: reduce) {
+    .rays, .aurora { animation: none; }
 }

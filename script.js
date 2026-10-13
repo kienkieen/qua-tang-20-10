@@ -37,6 +37,15 @@ const CONFETTI_COLORS = {
 const rand = (a, b) => a + Math.random() * (b - a);
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// ⚡ Chế độ "nhẹ": điện thoại / màn cảm ứng / máy ít RAM, CPU -> giảm số hạt hiệu ứng
+const LITE = (
+    window.matchMedia("(max-width: 820px), (pointer: coarse)").matches ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
+    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
+);
+const K = LITE ? 0.5 : 1;                       // hệ số giảm số lượng hạt
+const cnt = (n) => Math.max(1, Math.round(n * K));
+
 // =====================================================
 // MỞ / ĐÓNG THƯ
 // =====================================================
@@ -72,6 +81,7 @@ function openEnvelope(type = "love") {
             const modalEl = document.getElementById(modal);
             modalEl.scrollTop = 0;
             modalEl.classList.add("show");
+            document.body.classList.add("has-letter");   // ẩn nền ambient -> dừng animation phía sau
 
             prepareGalleryReveal(modalEl);
             // thư tốt nghiệp: pháo giấy nổ đúng lúc rèm kéo ra
@@ -88,7 +98,7 @@ function closeLetter() {
     stopLoveMusic();                         // đóng thư là tắt nhạc
     closeLightbox();
     closeCinema();
-    document.body.classList.remove("grad-open");
+    document.body.classList.remove("grad-open", "has-letter");
 
     const { env, modal } = LETTERS[activeType];
     document.getElementById(modal).classList.remove("show");
@@ -317,21 +327,43 @@ document.addEventListener("keydown", (e) => {
 // =====================================================
 const cvs = document.getElementById("confetti-canvas");
 const cctx = cvs.getContext("2d");
-let W = 0, H = 0;
+let W = 0, H = 0, cvDpr = 1;
 let parts = [];
 let rafId = null;
 let lastT = 0;
 
 function resizeCanvas() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, LITE ? 1.5 : 2);
+    cvDpr = dpr;
     W = window.innerWidth;
     H = window.innerHeight;
     cvs.width = W * dpr;
     cvs.height = H * dpr;
     cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-window.addEventListener("resize", resizeCanvas);
+let _rzT;
+window.addEventListener("resize", () => { clearTimeout(_rzT); _rzT = setTimeout(resizeCanvas, 120); });
 resizeCanvas();
+
+// Vẽ emoji bằng fillText mỗi khung hình rất chậm -> vẽ 1 lần ra sprite rồi drawImage
+const spriteCache = new Map();
+function emojiSprite(emoji, size) {
+    const sz = Math.max(12, Math.round(size / 4) * 4);
+    const key = emoji + sz + "@" + cvDpr;
+    let sp = spriteCache.get(key);
+    if (sp) return sp;
+    const px = Math.ceil(sz * 1.5 * cvDpr);
+    const c = document.createElement("canvas");
+    c.width = c.height = px;
+    const x = c.getContext("2d");
+    x.font = Math.round(sz * cvDpr) + "px serif";
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    x.fillText(emoji, px / 2, px / 2);
+    sp = { c, w: px / cvDpr, sz };
+    spriteCache.set(key, sp);
+    return sp;
+}
 
 function addParticle(p) {
     p.life = 0;
@@ -391,7 +423,7 @@ function rain(type, ms) {
     const end = performance.now() + ms;
     const timer = setInterval(() => {
         if (performance.now() > end) return clearInterval(timer);
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < cnt(4); i++) {
             addParticle({
                 x: rand(0, W), y: -20,
                 vx: rand(-1.2, 1.2), vy: rand(1, 3.5),
@@ -402,7 +434,7 @@ function rain(type, ms) {
                 max: 420
             });
         }
-    }, 70);
+    }, LITE ? 90 : 70);
 }
 
 function tick(now) {
@@ -433,10 +465,8 @@ function tick(now) {
         cctx.rotate(p.rot * Math.PI / 180);
 
         if (p.shape === "emoji") {
-            cctx.font = p.size + "px serif";
-            cctx.textAlign = "center";
-            cctx.textBaseline = "middle";
-            cctx.fillText(p.emoji, 0, 0);
+            const sp = p.sprite || (p.sprite = emojiSprite(p.emoji, p.size));
+            cctx.drawImage(sp.c, -sp.w / 2, -sp.w / 2, sp.w, sp.w);
         } else {
             cctx.scale(1, Math.cos(p.wob));       // hiệu ứng lật giấy
             cctx.fillStyle = p.color;
@@ -460,7 +490,7 @@ function tick(now) {
 }
 
 function celebrate(type, big = false) {
-    const n = reduceMotion ? 0.25 : 1;
+    const n = (reduceMotion ? 0.25 : 1) * (LITE ? 0.6 : 1);
 
     if (type === "grad") {
         cannon("grad", 0, H, 62, 44, Math.round(70 * n), 26);
@@ -469,14 +499,14 @@ function celebrate(type, big = false) {
             cannon("grad", 0, H, 70, 40, Math.round(50 * n), 24);
             cannon("grad", W, H, 110, 40, Math.round(50 * n), 24);
         }, 280);
-        throwEmoji(["🎓"], big ? 10 : 6, [34, 54]);
+        throwEmoji(["🎓"], cnt(big ? 10 : 6), [34, 54]);
         if (big) {
-            throwEmoji(["🎉", "✨", "🌟"], 8, [26, 40]);
+            throwEmoji(["🎉", "✨", "🌟"], cnt(8), [26, 40]);
             rain("grad", 2200);
         }
     } else {
         cannon("love", W / 2, H, 90, 70, Math.round(60 * n), 26);
-        throwEmoji(["💖", "❤️", "💗", "💕", "🌸"], big ? 22 : 12, [26, 48]);
+        throwEmoji(["💖", "❤️", "💗", "💕", "🌸"], cnt(big ? 22 : 12), [26, 48]);
         if (big) rain("love", 2200);
     }
 }
@@ -485,6 +515,8 @@ function celebrate(type, big = false) {
 // TIM / EMOJI BAY LÊN
 // =====================================================
 function createHeartParticle(x, y, type = "love") {
+    const hc = document.getElementById("hearts-container");
+    if (hc.childElementCount > (LITE ? 14 : 30)) return;   // giới hạn số phần tử đang bay
     const heart = document.createElement("div");
     heart.className = "floating-heart";
     const emojis = EMOJI_SETS[type] || EMOJI_SETS.love;
@@ -500,11 +532,13 @@ function createHeartParticle(x, y, type = "love") {
     const duration = 3 + Math.random() * 3;
     heart.style.animationDuration = duration + "s";
 
-    document.getElementById("hearts-container").appendChild(heart);
-    setTimeout(() => heart.remove(), duration * 1000);
+    hc.appendChild(heart);
+    heart.addEventListener("animationend", () => heart.remove(), { once: true });
+    setTimeout(() => heart.remove(), duration * 1000 + 600);   // phòng khi animation bị tắt
 }
 
 function triggerHeartBurst(type = "love", count = 25) {
+    count = cnt(count);
     for (let i = 0; i < count; i++) {
         setTimeout(() => {
             createHeartParticle(
@@ -518,8 +552,9 @@ function triggerHeartBurst(type = "love", count = 25) {
 
 // Tim bay nhẹ ở nền
 setInterval(() => {
+    if (document.hidden || activeType === "grad" || reduceMotion) return;   // tab ẩn / thư tốt nghiệp: khỏi tạo
     createHeartParticle();
-}, 1200);
+}, LITE ? 2200 : 1200);
 
 // =====================================================
 // KHỞI TẠO: đốm sáng nền, lấp lánh trong thư, hiệu ứng ảnh, vệt sao
@@ -527,7 +562,7 @@ setInterval(() => {
 window.addEventListener("DOMContentLoaded", () => {
     // Đốm sáng lấp lánh ở nền trang
     const sparkleContainer = document.getElementById("sparkles-container");
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < (LITE ? 8 : 20); i++) {
         const s = document.createElement("div");
         s.className = "absolute rounded-full bg-rose-300 sparkle";
         const size = 2 + Math.random() * 4;
@@ -601,7 +636,7 @@ function playChime(frequency, duration) {
 // NHẠC NỀN TỪ FILE MP3 CỦA BẠN
 // =====================================================
 const bgMusic = document.getElementById("bgMusic");
-bgMusic.src = MUSIC.src;
+bgMusic.preload = "none";      // không tải nhạc khi vừa vào trang
 bgMusic.loop = true;
 
 const LABEL_PLAY = "<span>🎵 Phát Nhạc Dịu Ngọt</span>";
@@ -647,6 +682,7 @@ function toggleMusic() {
     if (!musicOn) {
         musicOn = true;
         setMusicUI(true);
+        if (!bgMusic.getAttribute("src")) bgMusic.src = MUSIC.src;   // nạp file lần đầu bấm
         bgMusic.volume = 0;
         const p = bgMusic.play();
         if (p && p.then) {
@@ -662,13 +698,14 @@ function toggleMusic() {
 // =====================================================
 // 💌 NHẠC THƯ 20/10: mở thư thì phát, đóng thư thì tắt
 // =====================================================
-const loveMusic = new Audio(MUSIC.loveSrc);
+const loveMusic = new Audio();
 loveMusic.loop = true;
-loveMusic.preload = "auto";
+loveMusic.preload = "none";    // chỉ tải khi mở thư 20/10
 
 function startLoveMusic() {
     if (musicOn) { musicOn = false; setMusicUI(false); bgMusic.pause(); }   // tránh hai bài chồng nhau
     clearInterval(loveMusic._fade);
+    if (!loveMusic.getAttribute("src")) loveMusic.src = MUSIC.loveSrc;
     loveMusic.currentTime = 0;
     loveMusic.volume = 0;
     syncLoveMuteBtn();
@@ -699,9 +736,9 @@ function syncLoveMuteBtn() {
 // =====================================================
 // NHẠC RIÊNG CHO TRÌNH CHIẾU (tự phát khi bấm trình chiếu)
 // =====================================================
-const slideMusic = new Audio(MUSIC.slideshowSrc);
+const slideMusic = new Audio();
 slideMusic.loop = true;
-slideMusic.preload = "auto";
+slideMusic.preload = "none";   // chỉ tải khi bấm trình chiếu
 let bgWasPlaying = false;
 
 function startSlideshowMusic() {
@@ -710,6 +747,7 @@ function startSlideshowMusic() {
         bgWasPlaying = true;
         fadeVolume(0, 400, () => bgMusic.pause());
     }
+    if (!slideMusic.getAttribute("src")) slideMusic.src = MUSIC.slideshowSrc;
     slideMusic.volume = 0;
     const p = slideMusic.play();
     if (p && p.then) {
@@ -779,12 +817,13 @@ function openCinema(start = 0, intro = true) {
     cin = { on: true, items, i: start, t: 0, total: 0, playing: false, ended: false, raf: 0, last: 0, token: cin.token + 1 };
     const tok = cin.token, el = $c("cinema");
     el.className = "cinema show" + (reduceMotion ? " calm" : "");
+    document.body.classList.add("cin-open");
     $c("cinPP").textContent = "⏸";
     $c("cinStage").innerHTML = "";
     $c("cinEnd").classList.remove("show");
     $c("cinTitle").innerHTML = `<small>${CINEMA.subtitle}</small><h2>${CINEMA.title}</h2>`;
     $c("cinTrack").innerHTML = items.map((f, j) =>
-        `<button class="reel-cell" data-n="${String(j + 1).padStart(2, "0")}" onclick="cinGo(${j})"><img src="${f.querySelector("img").src}" alt=""></button>`).join("");
+        `<button class="reel-cell" data-n="${String(j + 1).padStart(2, "0")}" onclick="cinGo(${j})"><img src="${f.querySelector("img").currentSrc || f.querySelector("img").src}" alt="" loading="lazy" decoding="async"></button>`).join("");
     $c("cinTimeline").innerHTML = items.map((f, j) => `<i onclick="cinGo(${j})"><b></b></i>`).join("");
     startSlideshowMusic();
 
@@ -828,7 +867,7 @@ function showSlide(i, dir = 1) {
     s.className = "cin-slide";
     s.style.cssText = `--s1:${rand(1.1, 1.2).toFixed(3)};--x:${(k * rand(1, 2.5)).toFixed(2)}%;--y:${rand(-1.5, 1.5).toFixed(2)}%;--dur:${CINEMA.slideMs + 1400}ms`;
     const srcUrl = im.currentSrc || im.src;
-    s.innerHTML = `<img class="cin-bg" src="${srcUrl}" alt=""><div class="cin-center"><div class="cin-frame"><img class="cin-pic" src="${srcUrl}" alt=""></div><p class="cin-cap"></p></div>`;
+    s.innerHTML = `<img class="cin-bg" src="${srcUrl}" alt="" decoding="async"><div class="cin-center"><div class="cin-frame"><img class="cin-pic" src="${srcUrl}" alt="" decoding="async"></div><p class="cin-cap"></p></div>`;
     const p = s.querySelector(".cin-cap");
     Array.from(cap).forEach((ch, j) => {
         const b = document.createElement("span");
@@ -850,7 +889,10 @@ function showSlide(i, dir = 1) {
     const c = cells[cin.i], vw = $c("cinTrack").parentElement.clientWidth;
     if (c) $c("cinTrack").style.transform = `translateX(${vw / 2 - (c.offsetLeft + c.offsetWidth / 2)}px)`;
 
-    [...$c("cinTimeline").children].forEach((e, j) => { e.firstChild.style.width = j < cin.i ? "100%" : "0%"; });
+    [...$c("cinTimeline").children].forEach((e, j) => { e.firstChild.style.transform = "scaleX(" + (j < cin.i ? 1 : 0) + ")"; });
+    // nạp sẵn ảnh kế tiếp để chuyển cảnh không bị khựng
+    const nx = cin.items[(cin.i + 1) % n], nim = nx && nx.querySelector("img");
+    if (nim) { const pre = new Image(); pre.decoding = "async"; pre.src = nim.currentSrc || nim.src; }
     $c("cinCount").textContent = String(cin.i + 1).padStart(2, "0") + " / " + String(n).padStart(2, "0");
 }
 
@@ -860,11 +902,14 @@ function cinLoop(now) {
     if (cin.playing && !cin.ended) {
         cin.t += dt; cin.total += dt;
         const b = $c("cinTimeline").children[cin.i];
-        if (b) b.firstChild.style.width = Math.min(100, cin.t / CINEMA.slideMs * 100) + "%";
+        if (b) b.firstChild.style.transform = "scaleX(" + Math.min(1, cin.t / CINEMA.slideMs).toFixed(3) + ")";
         if (cin.t >= CINEMA.slideMs) cin.i === cin.items.length - 1 ? endFilm() : showSlide(cin.i + 1, 1);
     }
-    const s = Math.floor(cin.total / 1000), fr = Math.floor((cin.total % 1000) / 41.67);   // 24 khung/giây
-    $c("cinTime").textContent = [Math.floor(s / 60), s % 60, fr].map((v) => String(v).padStart(2, "0")).join(":");
+    if (now - (cin.clk || 0) > 90) {              // đồng hồ chỉ cần cập nhật ~11 lần/giây
+        cin.clk = now;
+        const s = Math.floor(cin.total / 1000), fr = Math.floor((cin.total % 1000) / 41.67);   // 24 khung/giây
+        $c("cinTime").textContent = [Math.floor(s / 60), s % 60, fr].map((v) => String(v).padStart(2, "0")).join(":");
+    }
     cin.raf = requestAnimationFrame(cinLoop);
 }
 
@@ -895,6 +940,8 @@ function closeCinema() {
     if (!cin.on) return;
     cin.on = false; cin.token++;
     cancelAnimationFrame(cin.raf);
+    document.body.classList.remove("cin-open");
+    setTimeout(() => { if (!cin.on) $c("cinStage").innerHTML = ""; }, 700);   // giải phóng ảnh lớn khi đóng
     $c("cinema").classList.remove("show", "playing", "paused");
     $c("cinLeader").classList.remove("show");
     $c("cinTitle").classList.remove("show");
@@ -964,7 +1011,7 @@ function closeCinema() {
     // ---------- 2. Hạt bay lên (tim, hoa, bong bóng) ----------
     function spawnAmbient(seed) {
         const box = $("#ambient-items");
-        if (!box || box.childElementCount > 28) return;
+        if (!box || box.childElementCount > (LITE ? 10 : 28)) return;
         if (!seed && !idle()) return;
         const el = document.createElement("span");
         const bubble = Math.random() < 0.35;
@@ -983,7 +1030,7 @@ function closeCinema() {
     function seedStars() {
         const box = $("#ambient");
         if (!box) return;
-        for (let i = 0; i < 34; i++) {
+        for (let i = 0; i < (LITE ? 14 : 34); i++) {
             const s = document.createElement("i");
             s.className = "tstar";
             s.textContent = Math.random() < 0.5 ? "✦" : "✧";
@@ -1046,6 +1093,7 @@ function closeCinema() {
     function burst(x, y, n = 14, set = AMB_EMOJI, spread = [60, 170]) {
         const layer = fxLayer();
         if (!layer) return;
+        n = cnt(n);
         for (let i = 0; i < n; i++) {
             if (layer.childElementCount > 160) break;
             const el = document.createElement("span");
@@ -1159,9 +1207,9 @@ function closeCinema() {
         if (reduceMotion) return;   // tôn trọng người dùng muốn giảm chuyển động
 
         seedStars();
-        for (let i = 0; i < 14; i++) spawnAmbient(true);
-        setInterval(() => spawnAmbient(false), 650);
-        setTimeout(shootingStar, 2500);
+        for (let i = 0; i < (LITE ? 6 : 14); i++) spawnAmbient(true);
+        setInterval(() => spawnAmbient(false), LITE ? 1400 : 650);
+        if (!LITE) setTimeout(shootingStar, 2500);   // sao băng bỏ trên điện thoại
         initTilt();
 
         // Vệt sao theo con trỏ
@@ -1207,7 +1255,7 @@ function closeCinema() {
         box.className = "gm-bokeh";
         box.setAttribute("aria-hidden", "true");
         const COLORS = ["rgba(255,214,140,.7)", "rgba(255,150,200,.6)", "rgba(150,205,255,.55)", "rgba(255,255,255,.55)"];
-        for (let i = 0; i < 26; i++) {
+        for (let i = 0; i < (LITE ? 10 : 26); i++) {
             const size = rand(6, 38);
             const dot = document.createElement("i");
             dot.style.cssText =
@@ -1226,13 +1274,17 @@ function closeCinema() {
 
     // 2) Tiêu đề trượt xuống và mờ dần khi cuộn khỏi màn đầu
     if (stage && !reduceMotion) {
-        let ticking = false;
+        const ttl = stage.querySelector(".gm-title");
+        let ticking = false, lastP = -1;
         modal.addEventListener("scroll", () => {
             if (ticking) return;
             ticking = true;
             requestAnimationFrame(() => {
                 const p = Math.min(1, Math.max(0, modal.scrollTop / (stage.offsetHeight * 0.8)));
-                stage.style.setProperty("--sp", p.toFixed(3));
+                if (ttl && p !== lastP) {
+                    lastP = p;
+                    ttl.style.setProperty("--sp", p.toFixed(3));   // đặt trên chính tiêu đề (không lan ra cả màn hình)
+                }
                 ticking = false;
             });
         }, { passive: true });
@@ -1286,7 +1338,7 @@ function closeCinema() {
     const box = document.querySelector("#letter-modal .lm-petals");
     if (!box || reduceMotion) return;
     const TONES = ["#ffc2d8", "#ff9ec2", "#ff7eb3", "#ffd9e6", "#ffb3a7"];
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < (LITE ? 10 : 24); i++) {
         const p = document.createElement("i");
         p.style.cssText =
             "--x:" + rand(0, 100).toFixed(1) + "%;" +
