@@ -2661,3 +2661,86 @@ html.lite .cin-slide { animation-duration: .9s; }
 html.lite .cin-slide.out { transition-duration: .9s; }
 html.lite .fx-leak { inset: 0; }
 html.lite .cin-frame::after { display: none; }
+
+/* =====================================================================
+   ⚡ v4 — GIẢM LAG: bấm phong thư · cuộn thư · xem phim (đặt cuối file để ghi đè)
+   ---------------------------------------------------------------------
+   Nguyên tắc: trên điện thoại (html.lite) chỉ giữ animation chạy bằng GPU
+   (transform / opacity). Bỏ filter drop-shadow & blur trên phần tử đang
+   chuyển động, bỏ lớp full-screen chồng nhau, bỏ bo góc quanh ảnh đang zoom.
+   ===================================================================== */
+
+/* ---------- 1. BẤM PHONG THƯ ---------- */
+
+/* Trước: "transition: all" trên cả màn hình phong thư -> trình duyệt phải theo dõi mọi thuộc tính */
+#envelope-section { transition: opacity .35s ease, transform .35s ease; }
+
+/* bỏ độ trễ chạm + không để :hover "dính" khi chạm trên điện thoại làm chạy chồng 2 animation */
+.envelope, .cute-btn, .gm-btn, .gm-play, .lm-btn, .lm-send, .gm-frame { touch-action: manipulation; }
+@media (hover: none) {
+    #envelope-section .envelope:not(.open):hover { --ty: 0px; --sc: 1; }
+    #envelope-section .envelope:not(.open):hover .envelope-flap { transform: none; }
+    #envelope-section .envelope:not(.open):hover .letter-card { transform: translateX(-50%) translateY(0); }
+}
+
+/* hai cột phong thư làm mờ bằng blur(3px) khi chọn 1 thư -> repaint cả nhánh có animation. Bỏ blur (mọi thiết bị) */
+.env-col { transition: scale .5s cubic-bezier(.34, 1.56, .64, 1), opacity .4s ease; }
+#envelope-section.has-open .env-col { filter: none; }
+
+/* thư 20/10: phóng cả màn hình từ scale .8 -> 1 (lớp full-screen khổng lồ) -> chỉ cần mờ dần vào */
+#letter-modal, #letter-modal.show { transform: none; transition: opacity .5s ease, visibility 0s; }
+#letter-modal:not(.show) { transition: opacity .35s ease, visibility 0s .35s; }
+
+/* drop-shadow trên phong thư đang bồng bềnh = blur lại ở mỗi khung hình -> bỏ trên điện thoại */
+html.lite #envelope-section .envelope-flap,
+html.lite #envelope-section .envelope.open .envelope-flap,
+html.lite #envelope-section .envelope-pocket,
+html.lite .stk { filter: none !important; }
+html.lite .stk { animation: none; }
+
+/* chọn 1 thư: cột còn lại mờ đi (opacity – GPU), không phóng to/thu nhỏ cả nhánh */
+html.lite .env-col { transition: opacity .3s ease; }
+html.lite #envelope-section.has-open .env-col,
+html.lite #envelope-section.has-open .env-col.chosen { scale: 1; filter: none; }
+html.lite #envelope-section.has-open .env-col:not(.chosen) { opacity: 0; }
+
+/* ---------- 2. CUỘN THƯ TỐT NGHIỆP (điện thoại) ---------- */
+
+html.lite .gm-bokeh { display: none; }
+html.lite #grad-modal .gm-beam { -webkit-mask-image: none; mask-image: none; }   /* mask trên lớp rộng 150% rất tốn */
+html.lite .gp-reel { filter: none; }                                              /* filter trên cuộn film đang xoay = vẽ lại mỗi khung hình */
+
+/* khung ảnh nằm thẳng (xoay ±1° làm mỗi khung thành 1 lớp riêng, ảnh bị răng cưa) */
+html.lite #grad-modal .gm-reel .gm-frame:nth-child(odd),
+html.lite #grad-modal .gm-reel .gm-frame:nth-child(even) { rotate: 0deg; }
+
+/* ảnh hiện dần nhanh hơn (trước 1.8s x 14 ảnh) */
+html.lite .gm-frame img { transition: opacity .5s ease; }
+
+/* ---------- 3. THƯ 20/10 (điện thoại) ---------- */
+html.lite .lm-heart { filter: none; }
+html.lite .ls-ring { display: none; }        /* box-shadow lan toả lặp vô hạn = repaint liên tục */
+
+/* ---------- 4. XEM PHIM (CINEMA) ---------- */
+
+/* thanh tiến độ mượt dù đồng hồ chỉ cập nhật ~11 lần/giây */
+.cin-tl b { transition: transform .12s linear; }
+
+/* phụ đề điện thoại: cả dòng hiện 1 lần (JS không còn tách từng chữ) */
+.cin-cap.whole { animation: capIn .7s ease .4s backwards; }
+
+html.lite .cin-bg,                    /* ảnh nền full-screen (2 lớp chồng nhau lúc chuyển cảnh) */
+html.lite .fx-vig,                    /* lớp tối viền full-screen */
+html.lite .fx-leak,                   /* loé "cháy film" full-screen */
+html.lite .cin-frame::after { display: none; }   /* lớp phủ màu lên ảnh đang zoom */
+
+/* ảnh đang zoom (Ken Burns) bị cắt bo góc + bóng đổ blur = mask + blur mỗi khung hình -> cắt vuông, viền mảnh */
+html.lite .cin-frame { border-radius: 0; box-shadow: 0 0 0 1px rgba(246, 196, 83, .5); }
+html.lite .cin-cap { text-shadow: 0 1px 3px #000; }
+html.lite .cin-spool, html.lite .cin-rec { animation: none; }
+
+/* chuyển cảnh: chỉ làm mờ vùng ảnh + phụ đề (nhỏ) thay vì cả lớp full-screen */
+html.lite .cin-slide { animation: none; }
+html.lite .cin-slide .cin-center { animation: cinIn .9s ease backwards; }
+html.lite .cin-slide.out { opacity: 1; transition: none; }
+html.lite .cin-slide.out .cin-center { opacity: 0; transition: opacity .9s ease; }

@@ -52,26 +52,32 @@ const cnt = (n) => Math.max(1, Math.round(n * K));
 let activeType = null;   // thư đang mở ("grad" | "love" | null)
 let closing = false;
 
+// Chạy SAU khi trình duyệt đã vẽ xong khung hình hiện tại -> việc nặng không chặn khung hình đầu của animation
+const afterPaint = (fn) => requestAnimationFrame(() => setTimeout(fn, 0));
+
 function openEnvelope(type = "love") {
     if (activeType) return;
     activeType = type;
-    document.body.classList.toggle("grad-open", type === "grad");
-
-    if (type === "love") startLoveMusic();   // thư 20/10: có nhạc ngay khi mở
-
     const { env, modal } = LETTERS[type];
+
+    // ① NGAY KHI BẤM: chỉ làm vài việc rất nhẹ -> CSS bắt đầu mở nắp thư ở khung hình kế tiếp
     document.getElementById(env).classList.add("open");
-    if (window.envelopeOpenFx) envelopeOpenFx(type);   // hiệu ứng loé sáng + pháo tim
+    document.body.classList.toggle("grad-open", type === "grad");
+    unlockAudio();                                   // iOS bắt buộc mở khoá âm thanh ngay trong lúc bấm (rất nhẹ)
+    if (type === "love") startLoveMusic();           // thư 20/10: có nhạc ngay khi mở
 
-    // Âm thanh mở thư
-    playChime(523.25, 0.1);                            // C5
-    setTimeout(() => playChime(659.25, 0.1), 150);     // E5
-    setTimeout(() => playChime(783.99, 0.2), 300);     // G5
-    if (type === "grad") setTimeout(() => playChime(1046.5, 0.4), 480); // C6
+    // ② SAU KHUNG HÌNH ĐẦU: âm thanh + hiệu ứng, mỗi việc một nhịp (trước đây dồn hết vào đúng lúc bấm -> giật)
+    afterPaint(() => {
+        playChime(523.25, 0.1, 0);                   // C5
+        playChime(659.25, 0.1, 0.15);                // E5
+        playChime(783.99, 0.2, 0.3);                 // G5
+        if (type === "grad") playChime(1046.5, 0.4, 0.48);   // C6
+        setTimeout(() => { if (window.envelopeOpenFx) envelopeOpenFx(type); }, 70);   // loé sáng + hạt
+        if (!LITE) setTimeout(() => triggerHeartBurst(type, 25), 170);                // điện thoại: bỏ pháo tim DOM
+    });
 
-    triggerHeartBurst(type, LITE ? 10 : 25);
-
-    // Sau khi phong thư mở, chuyển mượt sang lá thư lớn
+    // ③ Sau khi phong thư mở, chuyển mượt sang lá thư lớn
+    const WAIT = LITE ? 750 : 900, FADE = 380;
     setTimeout(() => {
         const section = document.getElementById("envelope-section");
         section.style.opacity = "0";
@@ -90,8 +96,8 @@ function openEnvelope(type = "love") {
             if (type === "grad") setTimeout(() => { if (activeType === "grad") celebrate(type); }, 1700);
             else celebrate(type);
             if (MUSIC.autoPlayOnOpen && !musicOn) toggleMusic();
-        }, 400);
-    }, 900);
+        }, FADE);
+    }, WAIT);
 }
 
 function closeLetter() {
@@ -128,12 +134,10 @@ function closeLetter() {
 // =====================================================
 function sendWishes(type, btn) {
     // Hợp âm vui
-    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
-        setTimeout(() => playChime(f, 0.35), i * 110)
-    );
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => playChime(f, 0.35, i * 0.11));
 
     celebrate(type, true);
-    triggerHeartBurst(type, 45);
+    if (!LITE) triggerHeartBurst(type, 45);   // điện thoại: pháo giấy canvas là đủ, bỏ 20+ phần tử DOM
 
     if (btn) {
         if (!btn.dataset.orig) btn.dataset.orig = btn.innerHTML;
@@ -173,6 +177,7 @@ function photoMissing(img) {
 const PH = (() => {
     const MAX = LITE ? 1280 : 1920;     // cạnh dài tối đa của bản "xem"
     const THUMB = 240;                  // cạnh dài của thumb cuộn film
+    const CARD = LITE ? 720 : 1000;     // cạnh dài của bản dành cho ô lưới thư viện (ô chỉ rộng ~200–330px)
     const LIMIT = LITE ? 1 : 2;         // số ảnh xử lý cùng lúc
     const done = new Map();             // src -> kết quả
     const jobs = new Map();             // src -> công việc đang chờ / đang chạy
@@ -204,15 +209,28 @@ const PH = (() => {
             cx.imageSmoothingQuality = "high";
             cx.drawImage(im, 0, 0, w, h);
             const view = k < 1 ? await toUrl(cv, 0.82) : src;       // ảnh vốn đã nhỏ thì dùng luôn
-            const t = Math.min(1, THUMB / Math.max(w, h));
+            // bản "card" cho ô lưới: giải mã ảnh 720px nhẹ hơn ~3 lần so với 1280px -> cuộn thư viện mượt, đỡ tốn RAM
+            const kc = Math.min(1, CARD / Math.max(w, h));
+            let card = view, cc = null;
+            if (kc < 1) {
+                cc = document.createElement("canvas");
+                cc.width = Math.max(1, Math.round(w * kc)); cc.height = Math.max(1, Math.round(h * kc));
+                const cx2 = cc.getContext("2d");
+                cx2.imageSmoothingQuality = "high";
+                cx2.drawImage(cv, 0, 0, cc.width, cc.height);
+                card = await toUrl(cc, 0.78);
+            }
+            const sc = cc || cv;                                     // thumb lấy từ bản nhỏ nhất đang có
+            const t = Math.min(1, THUMB / Math.max(sc.width, sc.height));
             const tc = document.createElement("canvas");
-            tc.width = Math.max(1, Math.round(w * t)); tc.height = Math.max(1, Math.round(h * t));
+            tc.width = Math.max(1, Math.round(sc.width * t)); tc.height = Math.max(1, Math.round(sc.height * t));
             const tx = tc.getContext("2d");
             tx.imageSmoothingQuality = "high";
-            tx.drawImage(cv, 0, 0, tc.width, tc.height);
+            tx.drawImage(sc, 0, 0, tc.width, tc.height);
             const thumb = await toUrl(tc, 0.7);
             cv.width = cv.height = tc.width = tc.height = 0;         // trả bộ nhớ canvas ngay
-            return { view, thumb, w, h };
+            if (cc) cc.width = cc.height = 0;
+            return { view, card, thumb, w, h };
         } catch (e) {
             return { orig: true };                                    // canvas bị chặn -> dùng ảnh gốc như cũ
         } finally {
@@ -227,7 +245,7 @@ const PH = (() => {
             build(j.src)
                 .catch(() => ({ orig: true }))
                 .then((r) => { done.set(j.src, r); j.res(r); })
-                .finally(() => { jobs.delete(j.src); running--; setTimeout(pump, LITE ? 40 : 10); });   // nghỉ một nhịp cho trình duyệt vẽ
+                .finally(() => { jobs.delete(j.src); running--; setTimeout(pump, LITE ? (cin.on ? 180 : 40) : 10); });   // nghỉ một nhịp cho trình duyệt vẽ (lâu hơn khi đang chiếu phim)
         }
     }
 
@@ -264,7 +282,9 @@ async function loadPhoto(im, urgent) {
     if (im.dataset.done) return;
     im.dataset.done = "1";
     if (r.missing) { photoMissing(im); return; }                     // ảnh thiếu: giữ cơ chế ẩn / hiện khung gợi ý như cũ
-    im.src = r.orig ? src : r.view;
+    // ô lưới dùng bản "card" (nhẹ); ảnh lớn đầu tiên dùng bản "view"
+    const big = !!im.closest(".gm-lead");
+    im.src = r.orig ? src : ((big ? r.view : r.card) || r.view);
 }
 
 // Chỉ nạp ảnh khi sắp cuộn tới (chứ không nạp cả 14 ảnh ngay khi mở thư)
@@ -377,15 +397,15 @@ function openLightbox(figure) {
 function renderLightbox(dir) {
     const fig = lbItems[lbIndex];
     if (!fig) return;
-    const src = fig.querySelector("img");
     const img = document.getElementById("lightboxImg");
+    const orig = photoSrc(fig);
+    const r = PH.peek(orig);
 
-    const known = src.currentSrc || src.src;
-    if (known) img.src = known;                                       // bản xem đã nạp sẵn (blob nhỏ)
-    else {                                                            // chưa nạp -> nạp ngay rồi mới hiện
+    if (r && !r.missing) img.src = r.orig ? orig : r.view;            // bản xem lớn đã xử lý sẵn
+    else {                                                            // chưa xử lý -> làm ngay rồi mới hiện
         img.removeAttribute("src");
-        loadPhoto(src, true).then(() => {
-            if (lbItems[lbIndex] === fig) img.src = src.currentSrc || src.src;
+        PH.ensure(orig, true).then((rr) => {
+            if (lbItems[lbIndex] === fig && !rr.missing) img.src = rr.orig ? orig : rr.view;
         });
     }
     img.style.setProperty("--dir", dir || 1);
@@ -461,23 +481,40 @@ document.addEventListener("keydown", (e) => {
 // =====================================================
 const cvs = document.getElementById("confetti-canvas");
 const cctx = cvs.getContext("2d");
-let W = 0, H = 0, cvDpr = 1;
+let W = 0, H = 0, cvDpr = 1, cvOn = false;
 let parts = [];
 let rafId = null;
 let lastT = 0;
 
-function resizeCanvas() {
-    const dpr = Math.min(window.devicePixelRatio || 1, LITE ? 1.5 : 2);
-    cvDpr = dpr;
+// Canvas toàn màn hình luôn nằm đó (kể cả lúc không bắn gì) làm điện thoại phải ghép thêm 1 lớp lớn ở MỌI khung hình.
+// -> chỉ cấp bộ nhớ + hiện canvas khi có hạt, bắn xong thì thu về 0.
+function measureCanvas() {
+    cvDpr = Math.min(window.devicePixelRatio || 1, LITE ? 1 : 2);
     W = window.innerWidth;
     H = window.innerHeight;
-    cvs.width = W * dpr;
-    cvs.height = H * dpr;
-    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function showCanvas() {
+    if (cvOn) return;
+    measureCanvas();
+    cvs.width = Math.round(W * cvDpr);
+    cvs.height = Math.round(H * cvDpr);
+    cctx.setTransform(cvDpr, 0, 0, cvDpr, 0, 0);
+    cvs.style.display = "block";
+    cvOn = true;
+}
+function hideCanvas() {
+    if (!cvOn) return;
+    cvs.style.display = "none";
+    cvs.width = cvs.height = 0;
+    cvOn = false;
 }
 let _rzT;
-window.addEventListener("resize", () => { clearTimeout(_rzT); _rzT = setTimeout(resizeCanvas, 120); });
-resizeCanvas();
+window.addEventListener("resize", () => {
+    clearTimeout(_rzT);
+    _rzT = setTimeout(() => { measureCanvas(); if (cvOn) { cvOn = false; showCanvas(); } }, 120);
+});
+measureCanvas();
+cvs.style.display = "none";
 
 // Vẽ emoji bằng fillText mỗi khung hình rất chậm -> vẽ 1 lần ra sprite rồi drawImage
 const spriteCache = new Map();
@@ -507,6 +544,7 @@ function addParticle(p) {
     p.g = p.g ?? 0.16;
     parts.push(p);
     if (!rafId) {
+        showCanvas();
         lastT = performance.now();
         rafId = requestAnimationFrame(tick);
     }
@@ -619,7 +657,7 @@ function tick(now) {
         rafId = requestAnimationFrame(tick);
     } else {
         rafId = null;
-        cctx.clearRect(0, 0, W, H);
+        hideCanvas();
     }
 }
 
@@ -684,12 +722,12 @@ function triggerHeartBurst(type = "love", count = 25) {
     }
 }
 
-// Tim bay nhẹ ở nền
-setInterval(() => {
+// Tim bay nhẹ ở nền (điện thoại: bỏ – đã có hạt bay ở #ambient)
+if (!LITE) setInterval(() => {
     if (!window.__introDone) return;                                          // đợi intro xong mới thả tim
     if (document.hidden || activeType || reduceMotion) return;                // tab ẩn / đang mở thư: khỏi tạo
     createHeartParticle();
-}, LITE ? 3000 : 1200);
+}, 1200);
 
 // =====================================================
 // KHỞI TẠO: đốm sáng nền, lấp lánh trong thư, hiệu ứng ảnh, vệt sao
@@ -741,28 +779,49 @@ window.addEventListener("DOMContentLoaded", () => {
 // =====================================================
 let audioCtx = null;
 
-function playChime(frequency, duration) {
+function ensureAudio() {
+    if (audioCtx) return audioCtx;
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+    return audioCtx;
+}
+
+// Tạo sẵn AudioContext lúc trình duyệt rảnh (tạo nó mất vài chục – vài trăm ms trên điện thoại).
+// Nhờ vậy lúc bấm phong thư không bị khựng. (Nó ở trạng thái "suspended" cho tới khi người dùng chạm.)
+function warmAudio() {
+    const go = () => ensureAudio();
+    if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 2500 });
+    else setTimeout(go, 1500);
+}
+
+// phải gọi ngay trong lúc người dùng bấm (iOS) – chỉ resume, không tạo gì nặng
+function unlockAudio() {
     try {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === "suspended") {
-            audioCtx.resume();
-        }
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
+        const c = ensureAudio();
+        if (c && c.state === "suspended") c.resume();
+    } catch (e) {}
+}
+
+// delay (giây): lên lịch nốt nhạc bằng đồng hồ của audio -> không cần nhiều setTimeout
+function playChime(frequency, duration, delay = 0) {
+    try {
+        const ctx = ensureAudio();
+        if (!ctx) return;
+        if (ctx.state === "suspended") ctx.resume();
+        const t0 = ctx.currentTime + delay;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
         osc.type = "sine";
-        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(frequency, t0);
 
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        gain.gain.setValueAtTime(0.15, t0);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
 
         osc.connect(gain);
-        gain.connect(audioCtx.destination);
+        gain.connect(ctx.destination);
 
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
+        osc.start(t0);
+        osc.stop(t0 + duration);
     } catch (e) {
         console.log("Audio autoplay prevented or not supported");
     }
@@ -928,14 +987,19 @@ const $c = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let cin = { on: false, items: [], i: 0, t: 0, total: 0, playing: false, ended: false, raf: 0, last: 0, token: 0 };
 
+let tickBuf = null;
 function playTick() {                                // tiếng "tạch" của máy chiếu
     try {
-        if (!audioCtx) playChime(1, 0.01);
-        const c = audioCtx, n = Math.floor(c.sampleRate * 0.05);
-        const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
-        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+        const c = ensureAudio();
+        if (!c) return;
+        if (!tickBuf) {                              // tạo 1 lần rồi dùng lại (trước đây tạo + tính toán lại mỗi lần chuyển cảnh)
+            const n = Math.floor(c.sampleRate * 0.05);
+            tickBuf = c.createBuffer(1, n, c.sampleRate);
+            const d = tickBuf.getChannelData(0);
+            for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+        }
         const s = c.createBufferSource(), g = c.createGain();
-        g.gain.value = 0.12; s.buffer = buf; s.connect(g); g.connect(c.destination); s.start();
+        g.gain.value = 0.12; s.buffer = tickBuf; s.connect(g); g.connect(c.destination); s.start();
     } catch (e) {}
 }
 
@@ -949,7 +1013,7 @@ function openCinema(start = 0, intro = true) {
     const items = galleryItems();
     if (!items.length) return;
     closeLightbox();
-    cancelAnimationFrame(cin.raf);
+    clearInterval(cin.raf);
     cin = { on: true, items, i: start, t: 0, total: 0, playing: false, ended: false, raf: 0, last: 0, token: cin.token + 1, loading: false };
     const tok = cin.token, el = $c("cinema");
     el.className = "cinema show" + (reduceMotion ? " calm" : "");
@@ -988,7 +1052,7 @@ function openCinema(start = 0, intro = true) {
         showSlide(start, 1);
         cin.playing = true; el.classList.add("playing");
         cin.last = performance.now();
-        cin.raf = requestAnimationFrame(cinLoop);
+        cin.raf = setInterval(cinLoop, CIN_TICK);
     })();
 }
 
@@ -1053,21 +1117,27 @@ function mountSlide(fig, r, idx, tok) {
     const s = document.createElement("div");
     s.className = "cin-slide";
     s.style.cssText = `--s1:${rand(z[0], z[1]).toFixed(3)};--x:${(k * rand(1, 2.5)).toFixed(2)}%;--y:${rand(-1.5, 1.5).toFixed(2)}%;--dur:${CINEMA.slideMs + 1400}ms`;
-    s.innerHTML = `<img class="cin-bg" src="${bg}" alt="" decoding="async"><div class="cin-center"><div class="cin-frame"><img class="cin-pic" src="${url}" alt="" decoding="async"></div><p class="cin-cap"></p></div>`;
+    s.innerHTML = (LITE ? "" : `<img class="cin-bg" src="${bg}" alt="" decoding="async">`) + `<div class="cin-center"><div class="cin-frame"><img class="cin-pic" src="${url}" alt="" decoding="async"></div><p class="cin-cap"></p></div>`;
     const p = s.querySelector(".cin-cap");
-    Array.from(cap).forEach((ch, j) => {
-        const b = document.createElement("span");
-        b.textContent = ch; b.style.animationDelay = (0.5 + j * 0.04) + "s";
-        p.appendChild(b);
-    });
+    if (LITE || reduceMotion) {                                         // điện thoại: cả dòng hiện 1 lần (trước: mỗi chữ 1 phần tử + 1 animation + bóng blur)
+        p.textContent = cap; p.classList.add("whole");
+    } else {
+        Array.from(cap).forEach((ch, j) => {
+            const b = document.createElement("span");
+            b.textContent = ch; b.style.animationDelay = (0.5 + j * 0.04) + "s";
+            p.appendChild(b);
+        });
+    }
 
     const attach = () => {
         if (cin.token !== tok || !cin.on || cin.i !== idx) return;
         const st = $c("cinStage"), old = [...st.children];
         st.appendChild(s);
         old.forEach((o) => { o.classList.add("out"); setTimeout(() => o.remove(), 1400); });
-        const lk = $c("cinLeak");                                      // lóe sáng "cháy film" khi chuyển cảnh
-        lk.classList.remove("go"); void lk.offsetWidth; lk.classList.add("go");
+        if (!LITE) {                                                   // lóe sáng "cháy film" khi chuyển cảnh (điện thoại: bỏ)
+            const lk = $c("cinLeak");
+            lk.classList.remove("go"); void lk.offsetWidth; lk.classList.add("go");
+        }
         if (old.length) playTick();
     };
     // giải mã ảnh xong rồi mới đưa lên màn hình -> không bị nháy / khựng khung hình đầu
@@ -1075,24 +1145,25 @@ function mountSlide(fig, r, idx, tok) {
     if (pic.decode) pic.decode().then(attach, attach); else attach();
 }
 
-function cinLoop(now) {
+// Trước đây chạy requestAnimationFrame 60 lần/giây chỉ để cập nhật thanh tiến độ + đồng hồ -> chiếm luồng chính,
+// làm các khung hình chuyển cảnh bị trễ. Chuyển động thật (zoom, mờ dần, trượt cuộn film) do CSS/GPU lo,
+// còn bộ đếm giờ chỉ cần ~11 lần/giây.
+const CIN_TICK = 90;
+function cinLoop() {
     if (!cin.on) return;
-    const dt = Math.min(100, now - cin.last); cin.last = now;
+    const now = performance.now();
+    const dt = Math.min(250, now - cin.last); cin.last = now;
     if (cin.playing && !cin.ended && !cin.loading) {
         cin.t += dt; cin.total += dt;
-        if (now - (cin.tl || 0) > 80) {                // thanh tiến độ chỉ cần cập nhật ~12 lần/giây
-            cin.tl = now;
-            const b = $c("cinTimeline").children[cin.i];
-            if (b) b.firstChild.style.transform = "scaleX(" + Math.min(1, cin.t / CINEMA.slideMs).toFixed(3) + ")";
-        }
+        const b = $c("cinTimeline").children[cin.i];
+        if (b) b.firstChild.style.transform = "scaleX(" + Math.min(1, cin.t / CINEMA.slideMs).toFixed(3) + ")";
         if (cin.t >= CINEMA.slideMs) cin.i === cin.items.length - 1 ? endFilm() : showSlide(cin.i + 1, 1);
     }
-    if (now - (cin.clk || 0) > 90) {              // đồng hồ chỉ cần cập nhật ~11 lần/giây
+    if (now - (cin.clk || 0) > (LITE ? 250 : 90)) {      // đồng hồ timecode
         cin.clk = now;
         const s = Math.floor(cin.total / 1000), fr = Math.floor((cin.total % 1000) / 41.67);   // 24 khung/giây
         $c("cinTime").textContent = [Math.floor(s / 60), s % 60, fr].map((v) => String(v).padStart(2, "0")).join(":");
     }
-    cin.raf = requestAnimationFrame(cinLoop);
 }
 
 function endFilm() {
@@ -1121,7 +1192,7 @@ function cinMute(btn) { slideMusic.muted = !slideMusic.muted; btn.textContent = 
 function closeCinema() {
     if (!cin.on) return;
     cin.on = false; cin.token++;
-    cancelAnimationFrame(cin.raf);
+    clearInterval(cin.raf);
     document.body.classList.remove("cin-open");
     setTimeout(() => { if (!cin.on) $c("cinStage").innerHTML = ""; }, 700);   // giải phóng ảnh lớn khi đóng
     $c("cinema").classList.remove("show", "playing", "paused");
@@ -1195,7 +1266,7 @@ function closeCinema() {
     // ---------- 2. Hạt bay lên (tim, hoa, bong bóng) ----------
     function spawnAmbient(seed) {
         const box = $("#ambient-items");
-        if (!box || box.childElementCount > (LITE ? 7 : 28)) return;
+        if (!box || box.childElementCount > (LITE ? 5 : 28)) return;
         if (!seed && !idle()) return;
         const el = document.createElement("span");
         const bubble = Math.random() < 0.35;
@@ -1214,7 +1285,7 @@ function closeCinema() {
     function seedStars() {
         const box = $("#ambient");
         if (!box) return;
-        for (let i = 0; i < (LITE ? 8 : 34); i++) {
+        for (let i = 0; i < (LITE ? 6 : 34); i++) {
             const s = document.createElement("i");
             s.className = "tstar";
             s.textContent = Math.random() < 0.5 ? "✦" : "✧";
@@ -1370,7 +1441,7 @@ function closeCinema() {
 
         shockwave(cx, cy, type);
         const set = BURST_SET[type] || BURST_SET.love;
-        burst(cx, cy, LITE ? 14 : 36, set, [100, 360]);
+        burst(cx, cy, LITE ? 12 : 36, set, [100, 360]);
         if (!LITE) {
             setTimeout(() => burst(cx, cy - 50, 24, set, [60, 280]), 220);
             setTimeout(() => burst(cx, cy - 90, 18, set, [40, 220]), 480);
@@ -1415,6 +1486,7 @@ function closeCinema() {
         if (window.__introDone) return;
         window.__introDone = true;
         root.classList.add("intro-go", "intro-done");   // mở khoá các animation lặp vô hạn
+        warmAudio();                                    // tạo sẵn AudioContext lúc rảnh để lúc bấm thư không khựng
         if (reduceMotion || activeType) return;
         startAmbient();
     }
@@ -1425,9 +1497,9 @@ function closeCinema() {
         const later = window.requestIdleCallback ? (f) => requestIdleCallback(f, { timeout: 700 }) : (f) => setTimeout(f, 80);
         later(seedStars);
         // thả dần từng hạt (không bật cùng lúc) -> không bị giật khi emoji được vẽ lần đầu
-        const first = LITE ? 3 : 10;
+        const first = LITE ? 2 : 10;
         for (let i = 0; i < first; i++) setTimeout(() => spawnAmbient(true), 300 + i * 260);
-        setInterval(() => spawnAmbient(false), LITE ? 1900 : 650);
+        setInterval(() => spawnAmbient(false), LITE ? 2600 : 650);
         if (!LITE) {
             setTimeout(shootingStar, 2500);   // sao băng bỏ trên điện thoại
             setTimeout(() => {
@@ -1446,6 +1518,7 @@ function closeCinema() {
         if (reduceMotion) {   // tôn trọng người dùng muốn giảm chuyển động
             window.__introDone = true;
             root.classList.add("intro-go", "intro-done");
+            warmAudio();
             return;
         }
 
@@ -1469,7 +1542,7 @@ function closeCinema() {
         });
 
         // Người dùng chạm sớm thì không bắt họ chờ
-        window.addEventListener("pointerdown", () => { startIntro(); }, { once: true, passive: true });
+        window.addEventListener("pointerdown", () => { startIntro(); warmAudio(); }, { once: true, passive: true });
 
         waitFonts(LITE ? 1000 : 1300).then(startIntro);
         setTimeout(startIntro, 1500);   // chốt an toàn
@@ -1489,8 +1562,8 @@ function closeCinema() {
     if (!modal) return;
     const stage = modal.querySelector(".gm-stage");
 
-    // 1) Bụi sáng bay lên trong chùm sáng máy chiếu
-    if (!reduceMotion) {
+    // 1) Bụi sáng bay lên trong chùm sáng máy chiếu (điện thoại: bỏ – nhiều lớp animation chạy ngầm khi cuộn)
+    if (!reduceMotion && !LITE) {
         const box = document.createElement("div");
         box.className = "gm-bokeh";
         box.setAttribute("aria-hidden", "true");
@@ -1513,7 +1586,8 @@ function closeCinema() {
     }
 
     // 2) Tiêu đề trượt xuống và mờ dần khi cuộn khỏi màn đầu
-    if (stage && !reduceMotion) {
+    //    (điện thoại: bỏ – nó cập nhật style bằng JS ở MỖI khung hình cuộn nên làm cuộn bị giật)
+    if (stage && !reduceMotion && !LITE) {
         const ttl = stage.querySelector(".gm-title");
         let ticking = false, lastP = -1;
         modal.addEventListener("scroll", () => {
@@ -1578,7 +1652,7 @@ function closeCinema() {
     const box = document.querySelector("#letter-modal .lm-petals");
     if (!box || reduceMotion) return;
     const TONES = ["#ffc2d8", "#ff9ec2", "#ff7eb3", "#ffd9e6", "#ffb3a7"];
-    for (let i = 0; i < (LITE ? 10 : 24); i++) {
+    for (let i = 0; i < (LITE ? 6 : 24); i++) {
         const p = document.createElement("i");
         p.style.cssText =
             "--x:" + rand(0, 100).toFixed(1) + "%;" +
