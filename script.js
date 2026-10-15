@@ -11,7 +11,7 @@ const MUSIC = {
     src: "nhac.mp3",          // <-- đổi tên file nhạc của bạn ở đây
     volume: 0.7,              // 0 → 1
     autoPlayOnOpen: false,    // true = tự phát nhạc khi mở thư
-    loveSrc: "music/cho-anh-chut-thoi.mp3",      // <-- NHẠC THƯ 20/10: tự phát khi mở thư, tắt khi đóng thư (đổi tên file mp3 của bạn ở đây)
+    loveSrc: "music/neu-em-khong-xuat-hien-thi-sao.mp3",      // <-- NHẠC THƯ 20/10: tự phát khi mở thư, tắt khi đóng thư (đổi tên file mp3 của bạn ở đây)
     slideshowSrc: "music/di-giua-troi-ruc-ro.mp3"   // <-- bài tự phát khi xem trình chiếu (đổi đường dẫn nếu để trong thư mục khác, vd "music/hanh-trinh-ruc-ro.mp3")
 };
 
